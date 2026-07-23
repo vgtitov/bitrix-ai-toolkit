@@ -1,0 +1,11 @@
+id: bitrix-db-query-concat
+language: php
+severity: error
+message: "$DB->Query с конкатенацией переменной — риск SQL-инъекции. Экранируйте через $DB->ForSql() или каст (int)."
+note: >
+  Прямой запрос с подстановкой пользовательского ввода без экранирования = SQL-инъекция. См. AGENTS.md «Безопасность».
+  Правильно: $id = (int)$id;  $name = $DB->ForSql($name);  либо ORM/подготовленные фильтры.
+rule:
+  any:
+    - pattern: $DB->Query($A . $B)
+    - pattern: $DB->Query($A . $B . $$$)

@@ -1,0 +1,10 @@
+id: bitrix-cmodule-includemodule
+language: php
+severity: warning
+message: "CModule::IncludeModule — устаревший вызов. В новом коде используйте \\Bitrix\\Main\\Loader::includeModule()."
+note: >
+  Старое ядро. Современный D7-эквивалент — Bitrix\Main\Loader::includeModule('iblock'). См. AGENTS.md «Два ядра».
+rule:
+  any:
+    - pattern: CModule::IncludeModule($$$)
+    - pattern: \CModule::IncludeModule($$$)

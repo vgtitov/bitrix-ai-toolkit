@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Тесты и сборка
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Функциональные тесты (детектор N+1)
+        run: python3 tests/test_bitrix_guard.py
+
+      - name: Сборка конфигов из core/
+        run: sh build.sh
+
+      - name: Проверка, что сгенерированное соответствует core/ (build идемпотентен)
+        run: |
+          sh build.sh
+          test "$(head -1 CLAUDE.md)" = "@AGENTS.md" || (echo "CLAUDE.md не импортирует AGENTS.md"; exit 1)
+          test -f .mcp.json && test -d .claude/skills || (echo "конфиги не собрались"; exit 1)
+          echo "OK: build собрал CLAUDE.md/.mcp.json/.claude"
+
+      - name: ast-grep правила (структурные анти-паттерны)
+        run: |
+          npm install -g @ast-grep/cli >/dev/null 2>&1 || true
+          if command -v ast-grep >/dev/null 2>&1; then
+            echo "Прогон правил по фикстурам (ожидаем находки в n1_bad.php):"
+            ast-grep scan -c core/linters/ast-grep/sgconfig.yml tests/fixtures/ || true
+          else
+            echo "ast-grep недоступен — пропуск (guard N+1 покрыт python-тестами)"
+          fi

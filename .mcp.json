@@ -1,0 +1,22 @@
+{
+  "//": "Канонический MCP-профиль (ключ mcpServers). Из него build.sh генерит конфиги под каждый AI:",
+  "//claude": "  .mcp.json (mcpServers) · Cursor .cursor/mcp.json (mcpServers) · VS Code/Copilot .vscode/mcp.json (ключ 'servers') · Codex ~/.codex/config.toml (TOML)",
+  "//note": "Serena по умолчанию БЕЗ проекта — при запуске ограничивай область (--project) /local + нужными модулями, не всем /bitrix.",
+  "mcpServers": {
+    "bitrix-docs": {
+      "//": "Официальная справка REST Битрикс24 (hosted, без ключей). Для REST-интеграций.",
+      "type": "http",
+      "url": "https://mcp-dev.bitrix24.com/mcp"
+    },
+    "serena": {
+      "//": "Символьная навигация по коду (find_symbol/find_references) через LSP. Ограничивай --project.",
+      "command": "uvx",
+      "args": [
+        "--from", "git+https://github.com/oraios/serena",
+        "serena", "start-mcp-server",
+        "--context", "ide-assistant",
+        "--project", "${workspaceFolder}"
+      ]
+    }
+  }
+}

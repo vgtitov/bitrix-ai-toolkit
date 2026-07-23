@@ -1,0 +1,5 @@
+# ast-grep конфиг toolkit. Запуск проверки анти-паттернов Битрикс:
+#   ast-grep scan -c core/linters/ast-grep/sgconfig.yml <путь к /local>
+# Установка ast-grep: brew install ast-grep  (или npm i -g @ast-grep/cli)
+ruleDirs:
+  - rules

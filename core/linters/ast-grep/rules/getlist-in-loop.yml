@@ -1,0 +1,19 @@
+id: bitrix-getlist-in-loop
+language: php
+severity: warning
+message: "GetList/getList внутри цикла — вероятный N+1. Соберите ID и сделайте один запрос IN(...)."
+note: >
+  Обращение к БД в теле цикла порождает N+1 (100 элементов → 100+ запросов). См.
+  skills/bitrix-performance/references/queries-and-orm.md. Правильно: собрать все ID и один запрос с filter по массиву.
+rule:
+  any:
+    - pattern: $OBJ::GetList($$$)
+    - pattern: $OBJ::getList($$$)
+    - pattern: $OBJ->GetList($$$)
+    - pattern: $OBJ->getList($$$)
+  inside:
+    any:
+      - kind: while_statement
+      - kind: for_statement
+      - kind: foreach_statement
+    stopBy: end

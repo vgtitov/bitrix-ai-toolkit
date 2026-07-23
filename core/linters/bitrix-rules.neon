@@ -1,0 +1,27 @@
+# bitrix-rules.neon — точка расширения для кастомных PHPStan-правил под специфику Битрикс.
+#
+# Готового расширения «phpstan-bitrix» в экосистеме НЕТ — специфичные проверки (SQL-инъекции в $DB->Query,
+# старое API в новом коде, N+1) собираются своими правилами. Два уровня, оба уже есть в toolkit:
+#
+#   1. ДЕКЛАРАТИВНО (готово, без PHP-кода) — ast-grep-правила: core/linters/ast-grep/rules/*.yml
+#      Прогон: ast-grep scan -c core/linters/ast-grep/sgconfig.yml local/
+#      Ловит: getlist-in-loop (N+1), db-query-concat (SQL-инъекция), cmodule-includemodule (старое API),
+#             component-cache-off (отключённый кэш), unescaped-output (XSS).
+#
+#   2. КАК PHPStan Rule (при необходимости строгой интеграции в phpstan) — реализовать класс,
+#      имплементирующий PHPStan\Rules\Rule, и зарегистрировать в services ниже. Пример скелета — в
+#      docs/custom-phpstan-rules.md. Пока правила живут в ast-grep (проще и переносимо).
+#
+# Проверка КОРРЕКТНОСТИ ЯДРА ПО ВЕРСИЯМ и УСТАРЕВШЕГО API решается не здесь, а в phpstan.neon.dist:
+#   scanDirectories на реальное ядро вашей версии + phpstan-deprecation-rules (ядро размечено @deprecated).
+
+parameters:
+    # сюда можно добавить игнор-паттерны, специфичные для Битрикс-ядра, чтобы убрать шум
+    ignoreErrors:
+        # пример: глобальные объекты старого ядра, если не покрыты стабами
+        # - '#Undefined variable: \$APPLICATION#'
+
+services:
+    # Регистрация кастомных PHPStan Rule (когда будут написаны как PHP-классы):
+    # - class: Local\PHPStan\Rules\NoDbQueryInLoopRule
+    #   tags: [phpstan.rules.rule]

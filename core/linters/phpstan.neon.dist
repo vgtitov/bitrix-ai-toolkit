@@ -1,0 +1,58 @@
+# phpstan.neon.dist — статанализ PHP под 1С-Битрикс
+#
+# Зашитая проверка: (1) типы/баги, (2) КОРРЕКТНОСТЬ работы с ядром КОНКРЕТНОЙ ВЕРСИИ,
+# (3) устаревшее API ядра (@deprecated). Скопируй в корень проекта как phpstan.neon и настрой пути.
+#
+# КАК РАБОТАЕТ ПРОВЕРКА ВЕРСИЙ ЯДРА (аналог «режима совместимости» 1С):
+#   PHPStan сам ругается «Call to undefined method», если метода нет в ТОЙ версии ядра,
+#   которую ты дал ему через scanDirectories. То есть версионность = какое ядро лежит рядом,
+#   а не «версионированные стабы» (их в экосистеме нет). Клади распакованное ядро своей версии.
+#
+# УСТАРЕВШЕЕ API: ядро Битрикс само размечено @deprecated в PHPDoc → phpstan-deprecation-rules
+#   автоматически выдаёт «используете устаревший метод ядра». Список вести не нужно.
+
+includes:
+    # Официальные правила — включают детектор устаревшего API и строгие проверки.
+    # composer require --dev phpstan/phpstan phpstan/phpstan-deprecation-rules phpstan/phpstan-strict-rules
+    - vendor/phpstan/phpstan-deprecation-rules/rules.neon
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+    # Кастомные правила toolkit под анти-паттерны Битрикс (SQL-инъекции, старое API, безопасность):
+    - ../core/linters/bitrix-rules.neon
+
+parameters:
+    # Уровень: legacy — низкий (1), новый код в /local — 4+. Референс: Habr 961832, spaceonfire/bitrix-tools.
+    level: 6
+
+    paths:
+        - local/php_interface
+        - local/components
+        - local/modules
+        - local/classes            # PSR-4 \Local\ — основной анализируемый код
+
+    # Ядро НЕ анализируем (оно legacy и чужое), но ДАЁМ PHPStan его ВИДЕТЬ для проверки версий/сигнатур.
+    # Замени пути на распакованное ядро СВОЕЙ версии (из bitrix-toolkit/bitrix-ci, env-docker или бэкапа).
+    scanDirectories:
+        - bitrix/modules/main/lib
+        - bitrix/modules/iblock/lib
+        - bitrix/modules/catalog/lib
+        - bitrix/modules/sale/lib
+        - bitrix/modules/highloadblock/lib
+
+    # Стабы: переопределяют типы функций/ORM ядра (иначе много ложных срабатываний).
+    #   bitrix.stub — типы процедурных функций ядра (напр. LocalRedirect → never).
+    #   orm.stub + orm_annotations.php — типы ORM (сгенерируй: php bitrix/modules/main/cli.php orm annotate).
+    stubFiles:
+        - ../core/linters/stubs/bitrix.stub
+    scanFiles:
+        - local/php_interface/orm_annotations.php   # результат `orm annotate` под твою версию ядра
+
+    # Заморозка legacy-ошибок, чтобы агент работал только с новыми (composer: phpstan --generate-baseline).
+    # - phpstan-baseline.neon
+
+    excludePaths:
+        - '*/bitrix/*'
+        - '*/vendor/*'
+        - '*/upload/*'
+
+    reportUnmatchedIgnoredErrors: false
+    treatPhpDocTypesAsCertain: false

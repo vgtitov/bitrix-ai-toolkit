@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<ruleset name="Bitrix-Local">
+    <description>PSR-12 + базовые проверки для кода /local Битрикс-проекта. Копируй в корень как phpcs.xml.</description>
+
+    <!-- Анализируем свой код, не ядро -->
+    <file>local/php_interface</file>
+    <file>local/components</file>
+    <file>local/modules</file>
+    <file>local/classes</file>
+
+    <exclude-pattern>*/bitrix/*</exclude-pattern>
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/upload/*</exclude-pattern>
+    <exclude-pattern>*/*.min.js</exclude-pattern>
+
+    <!-- Базовый стандарт: PSR-12 (официальная позиция Битрикс — PSR-1 + стиль PSR-2/12) -->
+    <rule ref="PSR12"/>
+
+    <arg name="extensions" value="php"/>
+    <arg name="colors"/>
+    <arg value="sp"/>
+
+    <!-- Длина строки: предупреждение 120, без жёсткого лимита (legacy-ядро длинное) -->
+    <rule ref="Generic.Files.LineLength">
+        <properties>
+            <property name="lineLimit" value="120"/>
+            <property name="absoluteLineLimit" value="0"/>
+        </properties>
+    </rule>
+</ruleset>

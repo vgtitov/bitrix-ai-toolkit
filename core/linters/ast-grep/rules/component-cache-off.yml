@@ -1,0 +1,9 @@
+id: bitrix-component-cache-off
+language: php
+severity: warning
+message: "Компонент с CACHE_TYPE='N' — кэш отключён. Убедитесь, что это осознанно (не для тяжёлого списка/каталога)."
+note: >
+  Отключённый кэш компонента на нагруженной странице — частая причина тормозов. См.
+  skills/bitrix-performance/references/caching.md. Отключать только для реально персонального/некэшируемого контента.
+rule:
+  pattern: "'CACHE_TYPE' => 'N'"

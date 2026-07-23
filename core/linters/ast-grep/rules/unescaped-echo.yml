@@ -1,0 +1,15 @@
+id: bitrix-unescaped-output
+language: php
+severity: warning
+message: "Вывод переменной без экранирования — риск XSS. Оборачивайте в htmlspecialcharsbx()."
+note: >
+  Прямой echo пользовательских/динамических данных = XSS. В Битрикс экранируют htmlspecialcharsbx($val).
+  См. AGENTS.md «Безопасность». Исключение — заведомо безопасный HTML (тогда явно прокомментировать).
+rule:
+  any:
+    - pattern: echo $VAR . $$$
+    - pattern: echo $$$ . $VAR
+  not:
+    has:
+      pattern: htmlspecialcharsbx($$$)
+      stopBy: end

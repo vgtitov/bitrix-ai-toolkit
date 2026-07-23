@@ -1,0 +1,37 @@
+#!/bin/sh
+# bitrix-guard: блокирует коммит staged *.php с обращением к БД в цикле (N+1):
+# GetList/getList/$DB->Query/GetProperty внутри while|for|foreach. ENFORCEMENT к
+# skills/bitrix-performance (references/queries-and-orm.md). Аналог bsl-guard из claude-1c-toolkit.
+# Кроссплатформенно (sh; на Windows — git-bash из состава Git).
+#
+# Ставится через core.hooksPath (scripts/install_git_hooks.py). Хук глобальный, поэтому detector
+# ищется гибко и в ЧУЖИХ репозиториях молча пропускает (exit 0). Явно указать toolkit — env BITRIX_TOOLKIT_DIR.
+
+files=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -iE '\.php$')
+[ -z "$files" ] && exit 0
+
+guard=""
+for cand in \
+  "$BITRIX_TOOLKIT_DIR/scripts/bitrix_guard.py" \
+  "$(dirname "$0")/../scripts/bitrix_guard.py" \
+  "$(dirname "$0")/bitrix_guard.py" \
+  "$(git rev-parse --show-toplevel 2>/dev/null)/scripts/bitrix_guard.py"
+do
+  [ -f "$cand" ] && guard="$cand" && break
+done
+[ -z "$guard" ] && exit 0   # detector не найден — не мешаем чужим репозиториям
+
+py=python3
+command -v "$py" >/dev/null 2>&1 || py=python
+command -v "$py" >/dev/null 2>&1 || exit 0
+
+# shellcheck disable=SC2086
+echo "$files" | xargs "$py" "$guard"
+rc=$?
+if [ "$rc" -ne 0 ]; then
+  echo "" >&2
+  echo "[bitrix-guard] коммит остановлен: обращение к БД в цикле (см. выше)." >&2
+  echo "  переделай пакетно (один запрос IN(...)); обойти разово: git commit --no-verify" >&2
+  exit 1
+fi
+exit 0

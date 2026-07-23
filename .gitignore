@@ -1,0 +1,33 @@
+# Зависимости
+/vendor/
+/node_modules/
+composer.lock
+
+# Демо-артефакты (локальные)
+/demo/*.cast
+/demo/*.gif
+/demo/*.mov
+/demo/*.mp4
+/demo/workspace/
+
+# Локальные конфиги/секреты
+.env
+*.local
+.claude/settings.local.json
+
+# Кэш инструментов
+.phpunit.result.cache
+.php-cs-fixer.cache
+/.phpstan/
+
+# Локализация под конкретную организацию (не в публичное ядро)
+/skills/*/references/local/
+/config/*.local.*
+
+# ОС
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc

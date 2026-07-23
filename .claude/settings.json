@@ -1,0 +1,19 @@
+{
+  "//": "Пример авто-линтеров для PHP/Битрикс. Хук PostToolUse срабатывает после каждой правки *.php:",
+  "//1": "  php-cs-fixer — авто-форматирует (агент не тратит токены на стиль),",
+  "//2": "  phpstan --error-format=json — отдаёт агенту машиночитаемые ошибки типов/багов для точечного фикса.",
+  "//3": "Пути к vendor/bin — под свой проект. matcher ограничивает хук инструментами правки файлов.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_FILE_PATHS\"; case \"$f\" in *.php) vendor/bin/php-cs-fixer fix \"$f\" --quiet 2>/dev/null; vendor/bin/phpstan analyse \"$f\" --error-format=json --no-progress 2>/dev/null ;; esac"
+          }
+        ]
+      }
+    ]
+  }
+}
