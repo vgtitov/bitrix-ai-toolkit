@@ -46,14 +46,33 @@ run_phpstan() {
     [ "$m" = "block" ] && rc_total=1 || echo "  (warn — не блокирует)"; }
 }
 
+run_phpmd() {
+  m=$(mode phpmd); [ "$m" = "off" ] && { echo "  phpmd: off (пропуск)"; return 0; }
+  command -v phpmd >/dev/null 2>&1 || { echo "  phpmd не установлен — пропуск"; return 0; }
+  say "PHPMD: сложность и размер ($m)"
+  phpmd $targets text "$TK/core/linters/phpmd.xml" || {
+    [ "$m" = "block" ] && rc_total=1 || echo "  (warn — не блокирует)"; }
+}
+
+run_jscpd() {
+  m=$(mode jscpd); [ "$m" = "off" ] && { echo "  jscpd: off (пропуск)"; return 0; }
+  command -v jscpd >/dev/null 2>&1 || { echo "  jscpd не установлен — пропуск"; return 0; }
+  say "jscpd: копипаста ($m)"
+  jscpd -c "$TK/core/linters/jscpd.json" $targets || {
+    [ "$m" = "block" ] && rc_total=1 || echo "  (warn — не блокирует)"; }
+}
+
 case "$CMD" in
   check)    run_guard; run_astgrep; run_phpstan ;;
+  full)     run_guard; run_astgrep; run_phpstan; run_phpmd; run_jscpd ;;
   guard)    run_guard ;;
   astgrep)  run_astgrep ;;
   phpstan)  run_phpstan ;;
+  phpmd)    run_phpmd ;;
+  jscpd)    run_jscpd ;;
   selftest) python3 "$TK/tests/test_bitrix_guard.py" ;;
   sh|bash)  exec /bin/sh ;;
-  *) echo "usage: check|guard|astgrep|phpstan|selftest|sh"; exit 2 ;;
+  *) echo "usage: check|full|guard|astgrep|phpstan|phpmd|jscpd|selftest|sh"; exit 2 ;;
 esac
 
 exit "$rc_total"

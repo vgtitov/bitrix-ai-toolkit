@@ -31,6 +31,19 @@ enabled = true
 enabled = true
 # mode = "block"    # хочешь жёстко ловить N+1 на СВОих коммитах — поставь block
 
+# --- Дополнительные проверки (все опциональны; нет инструмента → тихо пропускается) ---
+[checks.phpmd]
+enabled = false     # сложность/размер/God-class (composer require --dev phpmd/phpmd)
+
+[checks.jscpd]
+enabled = false     # копипаста (npm i -g jscpd)
+
+[checks.deptrac]
+enabled = false     # контроль слоёв: домен не знает про Bitrix\ (composer require --dev deptrac/deptrac)
+
+[checks.composer_audit]
+enabled = false     # уязвимости зависимостей (встроено в Composer 2.4+)
+
 [scope]
 # Гонять проверки ТОЛЬКО на этих путях (чтобы не трогать чужой/командный/легаси-код).
 paths = ["local/"]

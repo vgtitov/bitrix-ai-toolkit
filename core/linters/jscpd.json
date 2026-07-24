@@ -1,0 +1,23 @@
+{
+  "//": "jscpd — поиск копипасты. Живая замена заброшенному phpcpd (архив 2023).",
+  "//install": "npm i -g jscpd    (или npx jscpd)",
+  "//run": "jscpd -c core/linters/jscpd.json local/",
+  "//why": "Копипаста шаблонов и компонентов — эндемичная болезнь Битрикс-проектов: скопировали типовой шаблон, поправили пару строк, и так десять раз.",
+  "//optional": "Опционален: не установлен → шаг пропускается.",
+
+  "threshold": 5,
+  "minLines": 8,
+  "minTokens": 60,
+  "reporters": ["console"],
+  "format": ["php", "javascript"],
+  "ignore": [
+    "**/vendor/**",
+    "**/bitrix/**",
+    "**/upload/**",
+    "**/node_modules/**",
+    "**/*.min.js",
+    "**/tests/fixtures/**"
+  ],
+  "absolute": false,
+  "gitignore": true
+}

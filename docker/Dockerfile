@@ -27,9 +27,12 @@ RUN npm config set prefix /usr/local \
     && npm install -g @ast-grep/cli \
     || echo "[warn] ast-grep не установлен — проверки ast-grep будут пропущены"
 
+# jscpd — поиск копипасты (живая замена заброшенному phpcpd). Тоже неблокирующий шаг.
+RUN npm install -g jscpd || echo "[warn] jscpd не установлен — проверка копипасты будет пропущена"
+
 # Линтеры глобально, чтобы не зависеть от composer.json проекта
 RUN composer global require --no-interaction --no-progress \
-        phpstan/phpstan phpstan/phpstan-deprecation-rules phpstan/phpstan-strict-rules \
+        phpstan/phpstan phpstan/phpstan-deprecation-rules phpstan/phpstan-strict-rules phpmd/phpmd \
         friendsofphp/php-cs-fixer phpcsstandards/php_codesniffer rector/rector \
     && composer clear-cache
 ENV PATH="/root/.composer/vendor/bin:${PATH}"
