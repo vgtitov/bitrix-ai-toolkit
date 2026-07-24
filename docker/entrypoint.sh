@@ -18,11 +18,23 @@ say() { printf "\n\033[36m[checks] %s\033[0m\n" "$1"; }
 targets="${*:-.}"
 rc_total=0
 
+# Список .php для проверки. Уважает профиль «грязный легаси» ([scope].changed_only):
+# только изменённые файлы, если это git-репозиторий; иначе — обход scope.
+php_files() {
+  if [ -d .git ] && python3 "$TK/scripts/changed_files.py" --ext php 2>/dev/null | head -1 | grep -q .; then
+    python3 "$TK/scripts/changed_files.py" --ext php 2>/dev/null
+  elif [ -d .git ] && python3 "$TK/scripts/changed_files.py" --ext php >/dev/null 2>&1; then
+    :   # git есть, изменений нет → ничего не проверяем (легаси не трогаем)
+  else
+    find $targets -name '*.php' -not -path '*/vendor/*' -not -path '*/bitrix/*' 2>/dev/null | head -5000
+  fi
+}
+
 run_guard() {
   m=$(mode n1_guard); [ "$m" = "off" ] && { echo "  guard: off (пропуск)"; return 0; }
   say "N+1 guard ($m)"
-  files=$(find $targets -name '*.php' -not -path '*/vendor/*' -not -path '*/bitrix/*' 2>/dev/null | head -5000)
-  [ -z "$files" ] && { echo "  нет .php"; return 0; }
+  files=$(php_files)
+  [ -z "$files" ] && { echo "  нет изменённых .php (профиль «только изменённое») — пропуск"; return 0; }
   # shellcheck disable=SC2086
   if ! echo "$files" | xargs python3 "$TK/scripts/bitrix_guard.py"; then
     [ "$m" = "block" ] && rc_total=1 || echo "  (warn — не блокирует)"
