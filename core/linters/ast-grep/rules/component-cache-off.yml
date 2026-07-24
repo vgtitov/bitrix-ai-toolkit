@@ -6,4 +6,8 @@ note: >
   Отключённый кэш компонента на нагруженной странице — частая причина тормозов. См.
   skills/bitrix-performance/references/caching.md. Отключать только для реально персонального/некэшируемого контента.
 rule:
-  pattern: "'CACHE_TYPE' => 'N'"
+  # Отдельный паттерн "'CACHE_TYPE' => 'N'" парсится как ERROR (это фрагмент массива, а не самостоятельный
+  # AST-узел), поэтому задаём контекст и выбираем нужный узел селектором. Проверено на ast-grep 0.45.
+  pattern:
+    context: "$x = ['CACHE_TYPE' => 'N'];"
+    selector: array_element_initializer
