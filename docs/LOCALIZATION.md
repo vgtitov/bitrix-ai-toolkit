@@ -31,11 +31,16 @@ bitrix-ai-toolkit-acme/          # приватный репо компании
 
 Подключение (любой из способов):
 ```bash
-# вариант 1 — клонировать внутрь локального слоя (config/local в .gitignore)
-git clone git@git.company:team/bitrix-ai-toolkit-acme.git config/local
+# вариант 1 — клонировать ВНУТРЬ существующего config/local
+#   (сам каталог создаётся onboard'ом и не пуст — клонировать «в него целиком» нельзя)
+git clone git@git.company:team/bitrix-ai-toolkit-acme.git config/local/company
+cp config/local/company/checks.toml config/local/checks.toml        # или симлинки на файлы
+cp config/local/company/version-stack.toml config/local/version-stack.toml
 
-# вариант 2 — симлинк на общий каталог
-ln -s /path/to/bitrix-ai-toolkit-acme config/local
+# вариант 2 — симлинки на ФАЙЛЫ (а не на каталог: config/local уже существует,
+#   и `ln -s dir config/local` создаст ссылку ВНУТРИ него, которую скрипты не увидят)
+ln -sf /path/to/company/checks.toml       config/local/checks.toml
+ln -sf /path/to/company/version-stack.toml config/local/version-stack.toml
 
 # вариант 3 — только env (для CI)
 export BITRIX_AI_CHECKS=warn

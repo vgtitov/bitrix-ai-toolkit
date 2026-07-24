@@ -4,7 +4,7 @@
 Ловит вызовы, порождающие запрос к БД, внутри while/for/foreach:
   CIBlockElement::GetList / ::GetByID / ->GetNextElement (внутри цикла по элементам),
   *Table::getList / ->getList,  $DB->Query,  ->GetProperty / ::GetPropertyValues.
-Это прямой аналог bsl_guard.py из claude-1c-toolkit (там — Запрос…Выполнить() в Пока/Для).
+Это прямой аналог bsl_guard.py из bsl-ai-toolkit (там — Запрос…Выполнить() в Пока/Для).
 
 Чистый Python (stdlib), кроссплатформенно. Используется pre-commit хуком и вручную:
   python scripts/bitrix_guard.py local/**/*.php

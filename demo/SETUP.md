@@ -17,7 +17,7 @@ php -v                             # проверка
 cd /path/to/demo-project
 composer require --dev phpstan/phpstan \
                        friendsofphp/php-cs-fixer \
-                       squizlabs/php_codesniffer   # phpcs + phpcbf
+                       phpcsstandards/php_codesniffer   # phpcs + phpcbf
 vendor/bin/phpstan --version && vendor/bin/php-cs-fixer --version && vendor/bin/phpcs --version
 ```
 

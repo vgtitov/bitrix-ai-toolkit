@@ -14,7 +14,7 @@
   python scripts/atlassian.py conf search "критерии приёмки"
   python scripts/atlassian.py conf publish docs/page.md --parent 123456780
 
-Окружение (.env в CWD/корне репо подхватывается, уже установленное не перетирается):
+Окружение (.env читается из config/local/.env → корня toolkit → CWD; уже заданное не перетирается):
   JIRA_URL / CONFLUENCE_URL          — базовые URL (https://jira.example.com)
   JIRA_PAT / CONFLUENCE_PAT          — персональный токен → Bearer (Server/DC)
   JIRA_USER / CONFLUENCE_USER        — если задан, аутентификация Basic user:token (Cloud)
@@ -27,6 +27,7 @@ import json
 import os
 import re
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -37,19 +38,24 @@ for _s in (sys.stdout, sys.stderr):
     except Exception:
         pass
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "mcp"))
-try:
-    import onec_ops_mcp as _ops
-    _ops.load_dotenv_defaults()
-except Exception:  # автономный запуск без mcp/ — мини-разбор .env
-    for _d in (os.getcwd(), os.path.dirname(os.path.dirname(os.path.abspath(__file__)))):
-        _p = os.path.join(_d, ".env")
-        if os.path.isfile(_p):
+# Загрузка .env. ВАЖНО: документация (docs/integrations.md, docs/SETUP.md, docs/LOCALIZATION.md)
+# велит класть креды в config/local/.env — этот путь должен читаться ПЕРВЫМ.
+_TOOLKIT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+for _p in (
+    os.path.join(_TOOLKIT, "config", "local", ".env"),   # ← куда велит документация
+    os.path.join(_TOOLKIT, ".env"),
+    os.path.join(os.getcwd(), "config", "local", ".env"),
+    os.path.join(os.getcwd(), ".env"),
+):
+    if os.path.isfile(_p):
+        try:
             for _ln in open(_p, encoding="utf-8", errors="replace").read().splitlines():
                 _ln = _ln.strip()
                 if _ln and not _ln.startswith("#") and "=" in _ln:
                     _k, _v = _ln.split("=", 1)
                     os.environ.setdefault(_k.strip(), _v.strip().strip("'\""))
+        except OSError:
+            pass
 
 
 # ---------- общее ----------
@@ -79,8 +85,22 @@ def _req(kind: str, path: str, payload=None, method: str | None = None):
     if data is not None:
         hdrs["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=data, method=method or ("POST" if data else "GET"), headers=hdrs)
-    with urllib.request.urlopen(req, timeout=60) as r:
-        return json.loads(r.read() or b"{}")
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return json.loads(r.read() or b"{}")
+    except urllib.error.HTTPError as e:
+        # Понятное сообщение вместо стектрейса: чаще всего это протухший токен или нет прав.
+        hint = {
+            401: "не авторизован — проверь *_PAT (токен протух или не тот)",
+            403: "нет прав на этот объект (или требуется 2FA/капча — зайди в веб-интерфейс)",
+            404: "не найдено — проверь ключ задачи / id страницы и базовый *_URL",
+        }.get(e.code, "")
+        raise SystemExit(f"[atlassian] HTTP {e.code} {e.reason}{': ' + hint if hint else ''}\n  URL: {url}")
+    except urllib.error.URLError as e:
+        raise SystemExit(f"[atlassian] сеть недоступна: {e.reason}\n  URL: {url}\n"
+                         "  Проверь *_URL, VPN/прокси и доступность сервера.")
+    except json.JSONDecodeError:
+        raise SystemExit(f"[atlassian] ответ не JSON — вероятно, страница логина вместо API.\n  URL: {url}")
 
 
 def html_to_text(s: str) -> str:

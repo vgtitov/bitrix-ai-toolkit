@@ -6,13 +6,14 @@
 
 ### Added
 - Ядро `core/` (общее для всех AI-агентов): `AGENTS.md` (правила: два ядра, `/local`-гейт, «спроси инструмент»,
-  версии, безопасность, качество), скиллы `bitrix-dev` / `bitrix-analyst` / `bitrix-performance` (+6 references) /
+  версии, безопасность, качество), скиллы `bitrix-dev` / `bitrix-analyst` / `bitrix-performance` (+references) /
   `bitrix-admin-devops`.
 - Зашитые проверки: `phpstan.neon.dist` (+`phpstan-deprecation-rules`, совместимость по версии ядра через
   `scanDirectories`), ast-grep правила (N+1, SQL-инъекция, старое API, отключённый кэш, XSS),
   детектор N+1 `scripts/bitrix_guard.py`, `phpcs`/`php-cs-fixer`/`rector`.
-- Мульти-агентность: `adapters/` (claude — эталон; codex/gemini — фолбэк; cursor/copilot/cline/windsurf/aider —
-  rulesync/ручные) + `build.sh`. Оси переносимости: AGENTS.md + SKILL.md + MCP.
+- Мульти-агентность: `adapters/` + `build.sh`. Из коробки собираются Claude Code, Codex, Gemini CLI;
+  Cursor/Copilot/Cline — через внешний rulesync; Windsurf/Aider — вручную (см. `adapters/README.md`).
+  Оси переносимости: AGENTS.md + SKILL.md + MCP.
 - Git-хуки: `commit-msg` (чистые сообщения) + `pre-commit` (bitrix-guard N+1); `scripts/install_git_hooks.py`.
 - Автоустановка `onboard/install.sh` (инструменты + хуки + скиллы + сборка + самотест).
 - Тесты: `tests/test_bitrix_guard.py` + фикстуры.

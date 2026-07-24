@@ -1,6 +1,6 @@
 # Интеграции — все ОПЦИОНАЛЬНЫ (выключены, пока не заданы креды)
 
-Перенесены из `claude-1c-toolkit`. Только стандартная библиотека Python, без внешних зависимостей.
+Перенесены из `bsl-ai-toolkit`. Только стандартная библиотека Python, без внешних зависимостей.
 **Нет кред → интеграция просто не используется**, ничего не падает и не блокирует работу.
 
 ## Jira / Confluence — `scripts/atlassian.py`
@@ -35,7 +35,7 @@ ZABBIX_URL=http://zabbix.example/api_jsonrpc.php
 ZABBIX_TOKEN=...             # read-only токен: Zabbix UI → Профиль → API tokens
 PROMETHEUS_URL=http://prometheus.example
 ```
-> Для 1С в `claude-1c-toolkit` есть готовый `scripts/zabbix_perf.py` и MCP эксплуатации. Под Битрикс основной источник
+> Для 1С в `bsl-ai-toolkit` есть готовый `scripts/zabbix_perf.py` (в соседнем bsl-ai-toolkit, не здесь) и MCP эксплуатации. Под Битрикс основной источник
 > измерений — **штатный «Монитор производительности» (perfmon)**, slow query log и xhprof (см. скилл
 > `bitrix-performance`); Zabbix/Prometheus — как дополнительный слой инфраструктуры, если он уже есть.
 

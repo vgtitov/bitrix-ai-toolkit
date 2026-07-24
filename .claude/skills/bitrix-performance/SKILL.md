@@ -91,13 +91,13 @@ EXPLAIN тяжёлых SQL / xhprof. Только потом — гипотез�
 Детали — `references/diagnostics.md`.
 
 ## Качество = производительность: статически ловим анти-паттерны (ДО прода)
-Проактивный слой (ast-grep / PHPStan-правила toolkit, см. `../../linters/`):
+Проактивный слой (ast-grep / PHPStan-правила toolkit, см. `core/linters/` (в репозитории toolkit)):
 - **Запрос в цикле** (`GetList`/`getList`/`$DB->Query`/`GetProperty` внутри `while/for/foreach`) → N+1.
 - **GetList без явного select** на списках → выбор всех полей.
 - **Компонент с `CACHE_TYPE=>'N'`** в `IncludeComponent(...)` → кэш отключён, требует ревью.
 - **`SELECT *`** и конкатенация переменной в `$DB->Query`.
 - **Тяжёлые вызовы в init.php/dbconn.php** (`GetList`/HTTP/`file_get_contents(http...)`) — на каждом хите.
-Это прямой аналог того, как 1c-скилл ловит «запрос в цикле» в BSL. Правила — в `../../linters/ast-grep/`.
+Это прямой аналог того, как 1c-скилл ловит «запрос в цикле» в BSL. Правила — в `core/linters/ast-grep/` (в репозитории toolkit).
 
 ## Шпаргалка
 1. Всегда сначала замер. 2. Кэш (компонент → тег iblock_id_* → композит → Redis). 3. Запросы: явный select, индексы,

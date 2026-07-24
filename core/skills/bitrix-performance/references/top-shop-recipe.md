@@ -43,7 +43,7 @@ RPS-эффект (замеры Intervolga): 10K ИБ1.0 без фасета — 
 - **dataLayer/аналитика** (GTM/GA/Метрика/пиксели, e-commerce события).
 
 ## Что зашить в toolkit (автопроверки ревью)
-Статически (ast-grep/PHPStan, см. `../../linters/ast-grep/`):
+Статически (ast-grep/PHPStan, см. `core/linters/ast-grep/` (в репозитории toolkit)):
 1. Каталожный компонент с малым `CACHE_TIME` без тега `iblock_id_*` → «поставь тегированный кэш».
 2. `CACHE_TYPE=>'N'` в каталожных компонентах → ошибка ревью.
 3. N+1 (GetList/GetProperty в цикле), `GetNext()` без лимита → риск полного скана.

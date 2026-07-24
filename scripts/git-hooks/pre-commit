@@ -2,7 +2,7 @@
 # bitrix-guard (ОПЦИОНАЛЬНЫЙ): проверяет staged *.php на обращение к БД в цикле (N+1).
 # По умолчанию режим WARN — показывает находки, но НЕ блокирует коммит (не ухудшает жизнь разработчику).
 # Строгий гейт (block) — осознанно: config/checks.toml [checks.n1_guard].mode="block" или env BITRIX_AI_CHECKS=block.
-# Глобально выключить: BITRIX_AI_CHECKS=off. Аналог bsl-guard из claude-1c-toolkit, но опциональный.
+# Глобально выключить: BITRIX_AI_CHECKS=off. Аналог bsl-guard из bsl-ai-toolkit, но опциональный.
 # Кроссплатформенно (sh; на Windows — git-bash). Явно указать toolkit — env BITRIX_TOOLKIT_DIR.
 
 files=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -iE '\.php$' | grep -ivE '/(vendor|bitrix)/')

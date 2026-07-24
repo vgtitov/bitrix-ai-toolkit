@@ -43,7 +43,7 @@ rg -n "registerTag|TaggedCache"  .ai/framework-docs/pages/performance
 **свой фреймворк подрядчика/предыдущей команды** поверх Битрикс (нередко 30-40% функционала, свой namespace).
 Тогда порядок поиска: **кастомный слой → ядро Битрикс → `/local`** (при `priority = "over-bitrix"`).
 Документация Битрикс про их код ничего не знает — источник правды — их код (грепом/символьно).
-Непроверенное помечай `[кастомный слой, проверить]`. Подробно — `skills/bitrix-dev/references/custom-framework.md`.
+Непроверенное помечай `[кастомный слой, проверить]`. Подробно — `core/skills/bitrix-dev/references/custom-framework.md`.
 
 ## Два ядра — различай явно
 - **Старое ядро (процедурное):** `$APPLICATION`, `$USER`, `$DB`; `CIBlockElement::GetList`, `CModule`, `CFile`,
@@ -89,9 +89,9 @@ slow query log, `EXPLAIN`.
 - Нет инструмента (ast-grep/PHPStan) → шаг тихо пропускается. Нет конфига → дефолты. **Ничего не падает.**
 
 **Главное:** пиши качественный код ВСЕГДА, независимо от режима. Свод, который надо соблюдать проактивно —
-`skills/bitrix-dev/references/quality-standards.md` (это то, что поймал бы линтер). Проверки лишь подтверждают.
+`core/skills/bitrix-dev/references/quality-standards.md` (это то, что поймал бы линтер). Проверки лишь подтверждают.
 Если ядро проекта правлено (`core_modified = true`) — сигнатуры по ФАКТИЧЕСКОМУ коду, пометка `[правлено ядро]`
-(`skills/bitrix-dev/references/custom-core.md`).
+(`core/skills/bitrix-dev/references/custom-core.md`).
 
 ## Инструменты качества (зашитая проверка)
 - **PHPStan** + стабы ядра (`bitrix.stub`, `orm.stub`+`orm_annotations`, `scanDirectories` на модули ядра).

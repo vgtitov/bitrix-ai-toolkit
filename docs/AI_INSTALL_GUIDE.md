@@ -24,7 +24,13 @@ sh onboard/install.sh --no-tools   # если инструменты уже ст
 - **Windows**: git-хуки через git-bash; `build.sh` — тоже через sh (git-bash из состава Git).
 
 ## После onboard — что настроить в ПРОЕКТЕ (не автоматизируется)
-1. Скопировать `core/linters/{phpstan.neon.dist→phpstan.neon, phpcs.xml.dist, .php-cs-fixer.dist.php, rector.php}` в корень.
+1. **phpstan.neon — СГЕНЕРИРОВАТЬ, не копировать** (образец не знает раскладки проекта и будет ссылаться
+   на несуществующие пути → PHPStan упадёт до анализа):
+   ```bash
+   cd <корень проекта> && python3 <toolkit>/scripts/init_project.py --dry-run   # что нашёл
+   cd <корень проекта> && python3 <toolkit>/scripts/init_project.py             # записать
+   ```
+   Остальные копируются как есть: `core/linters/{phpcs.xml.dist, .php-cs-fixer.dist.php, rector.php}`.
 2. Заполнить `config/version-stack.toml` (PHP, версии модулей, legacy_required).
 3. Положить ядро своей версии по `[bitrix].core_path`; `orm annotate` → `orm_annotations.php`.
 4. MCP: `claude mcp add --transport http bitrix-docs https://mcp-dev.bitrix24.com/mcp`.

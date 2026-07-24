@@ -1,10 +1,14 @@
 #!/bin/sh
 # entrypoint контейнера проверок. Уважает опциональность (BITRIX_AI_CHECKS / config/checks.toml).
 # Команды:
-#   check     — прогнать все доступные проверки по /work (дефолт)
+#   check     — базовые проверки: стиль (cs-fixer --dry-run) + N+1 + ast-grep + PHPStan (дефолт)
+#   full      — check + PHPMD (сложность) + jscpd (копипаста)
+#   cs        — только проверка стиля
 #   guard     — только детектор N+1
 #   astgrep   — только структурные анти-паттерны
 #   phpstan   — только статанализ (нужен phpstan.neon в проекте)
+#   phpmd     — только сложность/размер
+#   jscpd     — только копипаста
 #   selftest  — самотест toolkit (тесты детектора)
 #   sh        — интерактивная оболочка
 set -eu
@@ -58,6 +62,15 @@ run_phpstan() {
     [ "$m" = "block" ] && rc_total=1 || echo "  (warn — не блокирует)"; }
 }
 
+run_cs() {
+  m=$(mode php_cs_fixer); [ "$m" = "off" ] && { echo "  cs-fixer: off (пропуск)"; return 0; }
+  command -v php-cs-fixer >/dev/null 2>&1 || { echo "  php-cs-fixer не установлен — пропуск"; return 0; }
+  say "PHP-CS-Fixer: стиль ($m)"
+  # В контейнере НЕ правим файлы молча — показываем diff. Автофикс делает хук у разработчика.
+  php-cs-fixer fix $targets --dry-run --diff 2>/dev/null || {
+    [ "$m" = "block" ] && rc_total=1 || echo "  (warn — не блокирует)"; }
+}
+
 run_phpmd() {
   m=$(mode phpmd); [ "$m" = "off" ] && { echo "  phpmd: off (пропуск)"; return 0; }
   command -v phpmd >/dev/null 2>&1 || { echo "  phpmd не установлен — пропуск"; return 0; }
@@ -75,8 +88,9 @@ run_jscpd() {
 }
 
 case "$CMD" in
-  check)    run_guard; run_astgrep; run_phpstan ;;
-  full)     run_guard; run_astgrep; run_phpstan; run_phpmd; run_jscpd ;;
+  check)    run_cs; run_guard; run_astgrep; run_phpstan ;;
+  full)     run_cs; run_guard; run_astgrep; run_phpstan; run_phpmd; run_jscpd ;;
+  cs)       run_cs ;;
   guard)    run_guard ;;
   astgrep)  run_astgrep ;;
   phpstan)  run_phpstan ;;
@@ -84,7 +98,7 @@ case "$CMD" in
   jscpd)    run_jscpd ;;
   selftest) python3 "$TK/tests/test_bitrix_guard.py" ;;
   sh|bash)  exec /bin/sh ;;
-  *) echo "usage: check|full|guard|astgrep|phpstan|phpmd|jscpd|selftest|sh"; exit 2 ;;
+  *) echo "usage: check|full|cs|guard|astgrep|phpstan|phpmd|jscpd|selftest|sh"; exit 2 ;;
 esac
 
 exit "$rc_total"

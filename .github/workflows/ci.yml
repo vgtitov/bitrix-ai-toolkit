@@ -7,7 +7,7 @@ on:
 
 jobs:
   test:
-    name: Тесты и сборка
+    name: Тесты, сборка и правила
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,19 +23,45 @@ jobs:
       - name: Сборка конфигов из core/
         run: sh build.sh
 
-      - name: Проверка, что сгенерированное соответствует core/ (build идемпотентен)
+      - name: Сгенерированное соответствует core/ (ловим дрейф)
         run: |
-          sh build.sh
-          test "$(head -1 CLAUDE.md)" = "@AGENTS.md" || (echo "CLAUDE.md не импортирует AGENTS.md"; exit 1)
-          test -f .mcp.json && test -d .claude/skills || (echo "конфиги не собрались"; exit 1)
-          echo "OK: build собрал CLAUDE.md/.mcp.json/.claude"
+          # build.sh уже отработал выше. Если закоммиченные CLAUDE.md/AGENTS.md/.claude/skills
+          # разошлись с core/ — здесь будет непустой diff, и это ошибка.
+          git diff --exit-code -- CLAUDE.md AGENTS.md .mcp.json .claude || {
+            echo "::error::Сгенерированные файлы разошлись с core/. Выполни 'sh build.sh' и закоммить результат."
+            exit 1
+          }
+          test "$(head -1 CLAUDE.md)" = "@AGENTS.md"
+          echo "OK: генерация синхронна с core/"
 
-      - name: ast-grep правила (структурные анти-паттерны)
+      - name: Скрипты устойчивы на краевых случаях
         run: |
-          npm install -g @ast-grep/cli >/dev/null 2>&1 || true
-          if command -v ast-grep >/dev/null 2>&1; then
-            echo "Прогон правил по фикстурам (ожидаем находки в n1_bad.php):"
-            ast-grep scan -c core/linters/ast-grep/sgconfig.yml tests/fixtures/ || true
-          else
-            echo "ast-grep недоступен — пропуск (guard N+1 покрыт python-тестами)"
+          set -e
+          test "$(python3 scripts/checks_config.py n1_guard)" = "warn"
+          printf 'битый [toml\n' > config/checks.toml
+          test "$(python3 scripts/checks_config.py n1_guard)" = "warn"
+          printf '[checks]\nn1_guard = "block"\n' > config/checks.toml
+          test "$(python3 scripts/checks_config.py n1_guard)" = "block"
+          rm -f config/checks.toml
+          python3 scripts/init_project.py --dry-run > /dev/null
+          echo "OK: скрипты устойчивы"
+
+      - name: ast-grep — правила валидны И срабатывают
+        run: |
+          npm install -g @ast-grep/cli >/dev/null 2>&1
+          # На плохой фикстуре находки ОБЯЗАНЫ быть, иначе правила сломаны и молча ничего не ловят
+          found=$(ast-grep scan -c core/linters/ast-grep/sgconfig.yml tests/fixtures/n1_bad.php 2>&1 | grep -cE '^(warning|error)\[' || true)
+          echo "находок в n1_bad.php: $found"
+          test "$found" -ge 2 || { echo "::error::ast-grep правила не сработали на заведомо плохом коде"; exit 1; }
+          # На хорошей фикстуре ложных срабатываний быть НЕ должно
+          false_pos=$(ast-grep scan -c core/linters/ast-grep/sgconfig.yml tests/fixtures/n1_good.php 2>&1 | grep -cE '^(warning|error)\[' || true)
+          echo "ложных срабатываний в n1_good.php: $false_pos"
+          test "$false_pos" -eq 0 || { echo "::error::ast-grep ложно срабатывает на корректном коде"; exit 1; }
+          echo "OK: правила ловят плохое и не трогают хорошее"
+
+      - name: Обезличенность публичного репозитория
+        run: |
+          if grep -rInE '(DCM-[0-9]|20949123|14881017)' --include='*.py' --include='*.md' --include='*.sh' . ; then
+            echo "::error::Найдены неообезличенные идентификаторы"; exit 1
           fi
+          echo "OK: обезличено"

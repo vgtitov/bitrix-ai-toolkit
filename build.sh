@@ -39,13 +39,17 @@ build_gemini()  { echo "[gemini] GEMINI.md → AGENTS.md";  cp -f core/AGENTS.md
 build_codex()   { echo "[codex] AGENTS.md (канон, читается нативно)"; cp -f core/AGENTS.md AGENTS.md; }
 
 build_rulesync() {
-  if command -v rulesync >/dev/null 2>&1 || command -v npx >/dev/null 2>&1; then
+  # ТОЛЬКО если rulesync реально установлен. Раньше здесь был фолбэк на `npx -y rulesync`,
+  # который при каждой сборке (в т.ч. в CI) тянул и исполнял сторонний npm-пакет из сети —
+  # неожиданная сетевая зависимость и supply-chain-шаг в инструменте, который сам учит гигиене зависимостей.
+  if command -v rulesync >/dev/null 2>&1; then
     echo "[rulesync] генерация под Cursor/Copilot/Cline/Windsurf/… (правила+MCP)"
-    RS="rulesync"; command -v rulesync >/dev/null 2>&1 || RS="npx -y rulesync"
+    RS="rulesync"
     $RS generate --targets claudecode,cursor,copilot,cline,geminicli,codexcli 2>/dev/null \
       || echo "[rulesync] пропущено (нет конфига .rulesync/ или сети) — фолбэк уже собран"
   else
-    echo "[rulesync] не установлен — фолбэк (Claude/Gemini/Codex) собран симлинками. Для остальных: npm i -g rulesync"
+    echo "[rulesync] не установлен — собраны Claude/Gemini/Codex (этого достаточно для работы)."
+    echo "           Для Cursor/Copilot/Cline/Windsurf: npm i -g rulesync && sh build.sh"
   fi
 }
 

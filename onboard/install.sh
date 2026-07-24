@@ -6,6 +6,8 @@
 #          sh onboard/install.sh --no-tools   # без установки инструментов (только хуки+скиллы+сборка)
 set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+INVOKED_FROM="$(pwd)"   # откуда запустили — там может быть проект
+prev_arg=""
 cd "$ROOT"
 WITH_TOOLS=1
 [ "${1:-}" = "--no-tools" ] && WITH_TOOLS=0
@@ -23,15 +25,27 @@ if [ "$WITH_TOOLS" = 1 ]; then
   else
     echo "  brew не найден. Поставь вручную: PHP 8.2+, Composer, ast-grep. Linux: apt/dnf + npm i -g @ast-grep/cli"
   fi
-  # Composer dev-зависимости — только если есть composer.json в целевом проекте (не в toolkit)
-  if have composer && [ -f composer.json ]; then
+  # Composer dev-зависимости ставятся В ПРОЕКТ, а не в toolkit.
+  # ВАЖНО: скрипт делает cd в корень toolkit, где composer.json нет и не будет, —
+  # поэтому путь к проекту берём из аргумента или из каталога, откуда скрипт запущен.
+  #   sh onboard/install.sh --project /путь/к/проекту
+  #   (или просто запусти из корня проекта: sh <toolkit>/onboard/install.sh)
+  PROJECT_DIR="$INVOKED_FROM"
+  for a in "$@"; do
+    case "$prev_arg" in --project) PROJECT_DIR="$a" ;; esac
+    prev_arg="$a"
+  done
+  if have composer && [ -f "$PROJECT_DIR/composer.json" ]; then
+    cd "$PROJECT_DIR" || true
     say "Composer dev-зависимости (PHPStan+deprecation, cs-fixer, phpcs, rector, phpunit)"
     composer require --dev --no-interaction \
       phpstan/phpstan phpstan/phpstan-deprecation-rules phpstan/phpstan-strict-rules \
       friendsofphp/php-cs-fixer phpcsstandards/php_codesniffer rector/rector phpunit/phpunit || \
       echo "  ! часть пакетов не поставилась — проверь composer.json проекта"
+    cd "$ROOT" || true
   else
-    echo "  (composer.json проекта не найден в CWD — dev-зависимости ставятся в проекте, не в toolkit)"
+    echo "  (composer.json проекта не найден в $PROJECT_DIR — линтеры ставятся В ПРОЕКТ:"
+    echo "     запусти из корня проекта или укажи: sh onboard/install.sh --project /путь)"
   fi
 fi
 
