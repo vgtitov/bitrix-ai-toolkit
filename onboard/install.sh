@@ -82,11 +82,22 @@ fi
 say "Готово. Дальше (подробно — docs/SETUP.md):"
 cat <<'NEXT'
   ОБЯЗАТЕЛЬНО в целевом проекте:
-  1. Линтер-конфиги: скопируй core/linters/{phpstan.neon.dist→phpstan.neon, phpcs.xml.dist,
-     .php-cs-fixer.dist.php, rector.php} в корень проекта.
-  2. config/version-stack.toml — версии PHP/ядра/модулей; путь к РЕАЛЬНОМУ ядру (core_path).
-     Ядро правлено? core_modified = true (см. skills/bitrix-dev/references/custom-core.md).
-  3. Справка: claude mcp add --transport http bitrix-docs https://mcp-dev.bitrix24.com/mcp
+  1. config/version-stack.toml — опиши СВОЙ проект:
+       [php].version                — 8.2/8.3
+       [bitrix].core_path           — путь к РЕАЛЬНОМУ ядру (его видит PHPStan → ловит «метода нет в версии»)
+       [bitrix].core_modified=true  — если ядро ПРАВЛЕНО (references/custom-core.md)
+       [[custom_layers]]            — если есть СВОЙ ФРЕЙМВОРК/namespace подрядчика поверх Битрикс
+                                      (references/custom-framework.md; поиск идёт в ТРЁХ слоях)
+  2. Сгенерируй конфиг под реальный проект (НЕ копируй образец руками — он ссылается на пути,
+     которых у тебя может не быть, и PHPStan упадёт до анализа):
+       cd <корень проекта> && python3 <toolkit>/scripts/init_project.py --dry-run   # посмотреть
+       cd <корень проекта> && python3 <toolkit>/scripts/init_project.py             # записать phpstan.neon
+     Скрипт сам находит ядро, кастомные слои и свой код; включает только существующие пути.
+     Остальные конфиги копируются как есть: core/linters/{phpcs.xml.dist, .php-cs-fixer.dist.php, rector.php}
+  3. composer require --dev phpstan/extension-installer phpstan/phpstan \
+        phpstan/phpstan-deprecation-rules phpstan/phpstan-strict-rules
+     (extension-installer подключает расширения САМ — вручную includes не прописывать)
+  4. Справка: claude mcp add --transport http bitrix-docs https://mcp-dev.bitrix24.com/mcp
 
   РЕЖИМ ПРОВЕРОК (config/checks.toml или env BITRIX_AI_CHECKS):
      off   — не проверять (AI пишет по знаниям скилла quality-standards.md)

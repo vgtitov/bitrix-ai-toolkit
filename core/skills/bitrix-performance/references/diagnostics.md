@@ -15,6 +15,35 @@ $s = microtime(true); /* ... */
 if ($USER->IsAdmin()) { /* профилирование только админу */ }
 ```
 
+## Штатная диагностика ядра (сначала она, потом внешние инструменты)
+Подтверждено официальной документацией (`.ai/framework-docs/pages/database/sql-tracker.md`, `pages/advanced/debug.md`).
+
+**SqlTracker — трекинг SQL прямо из кода.** Показывает, какие запросы реально ушли в БД на участке:
+```php
+$connection = \Bitrix\Main\Application::getConnection();
+$tracker = $connection->startTracker();          // начать сбор
+// ...исследуемый участок...
+$connection->stopTracker();
+foreach ($tracker->getQueries() as $q) {
+    \Bitrix\Main\Diag\Debug::writeToFile(
+        [$q->getSql(), $q->getTime()], 'sql', 'sql-trace.log'
+    );
+}
+echo $tracker->getCounter();  // сколько запросов
+echo $tracker->getTime();     // суммарное время
+```
+Это самый прямой способ доказать N+1: счётчик растёт пропорционально числу элементов.
+
+**`Diag\Debug` — дампы без порчи вывода:**
+```php
+\Bitrix\Main\Diag\Debug::dumpToFile($var, 'label', 'debug.log');   // в файл, не в страницу
+\Bitrix\Main\Diag\Debug::writeToFile($var, 'label', 'debug.log');
+```
+На проде — только в файл (`dumpToFile`), никогда в вывод.
+
+**Отладка в `.settings.php`** (секция `exception_handling`): `debug => true` на стенде — ошибки видны, а не
+глушатся в лог; на проде `false`. Логгеры настраиваются там же.
+
 ## Внешние профилировщики
 - **xhprof + XHGui** — иерархический (время/память/вызовы). Запускать на проде в пик (perfmon — когда нагрузка низкая).
 - **Blackfire / Tideways** — APM с флеймграфами, регрессионным сравнением.

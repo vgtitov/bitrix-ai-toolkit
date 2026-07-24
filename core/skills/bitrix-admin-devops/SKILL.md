@@ -27,9 +27,12 @@ composer.json/vendor — вне DOCUMENT_ROOT (иначе ломается вы�
 - Обязательный шаг после выкладки — `php sprint.php migrate` (применение миграций структуры).
 - Быстрый rollback — через артефакты/симлинки релизов.
 
-## Миграции (sprint.migration)
-Структуру инфоблоков/HL/свойств/прав менять ТОЛЬКО миграциями: `php migrate.php add <name>` → правка → `php migrate.php up`.
-Не руками в БД/админке без версионирования. Живой пакет (207★); НЕ использовать мёртвый arrilot.
+## Миграции — два разных слоя
+- **Структура** (инфоблоки, HL, свойства, права) — `andreyryabin/sprint.migration` (207★, живой):
+  `php migrate.php add <name>` → правка → `php migrate.php up`. Не руками в БД/админке без версионирования.
+  НЕ использовать мёртвый arrilot.
+- **Данные сущностей** между окружениями (dev→stage→prod) — `INTERVOLGA/intervolga.migrato` (90★, живой).
+  sprint.migration переносит **структуру**, migrato — **содержимое**. Это разные задачи, часто нужны обе.
 
 ## CI/CD (эталон)
 Референс: `ilimurzin/bitrix-project-example` (GitLab) — полный `.gitlab-ci.yml` с PHPStan (уровни 0-10) + PHP-CS-Fixer + Rector,

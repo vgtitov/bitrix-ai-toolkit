@@ -15,24 +15,57 @@ sh onboard/install.sh --no-tools   # если PHP/composer/ast-grep уже ст�
 `config/checks.toml` и `config/version-stack.toml` из образцов (существующие **не трогает**), собирает конфиги
 агентов (`build.sh`), прогоняет самотест.
 
-## Шаг 2. Линтер-конфиги в проект
+## Шаг 2. Опиши свой проект — `config/version-stack.toml`
+Это ключ к корректности: агент и анализатор должны знать **твою** раскладку, а не абстрактную.
+
+```toml
+[php]
+version = "8.3"                  # таргет Rector/PHPStan; синтаксис новее не предлагается
+
+[bitrix]
+core_path = "bitrix/modules"     # путь к РЕАЛЬНОМУ ядру → PHPStan ловит «метода нет в этой версии»
+core_modified = false            # true, если ядро ПРАВЛЕНО → сигнатуры по фактическому коду,
+                                 #   пометка [правлено ядро]  (references/custom-core.md)
+
+# Есть СВОЙ ФРЕЙМВОРК поверх Битрикс (подрядчика/предыдущей команды, свой namespace)?
+# Тогда агент ищет в ТРЁХ слоях: кастомный → ядро → /local. (references/custom-framework.md)
+[[custom_layers]]
+name = "vendor-framework"
+namespace = "Acme\\"
+path = "local/vendor-framework"
+priority = "over-bitrix"         # их методы предпочтительнее битриксовых
+
+[conventions]
+legacy_required = ["sale: оформление заказа…"]   # где D7-обёрток нет — чтобы линтер не «исправлял»
+```
+
+## Шаг 3. Сгенерируй конфиг под РЕАЛЬНЫЙ проект
+> ⚠️ Не копируй `phpstan.neon.dist` руками: образец не знает твоей раскладки и будет ссылаться на пути,
+> которых у тебя нет — PHPStan упадёт ещё до анализа («Scanned directory does not exist»).
+
 ```bash
-cp core/linters/phpstan.neon.dist       <проект>/phpstan.neon
+cd <корень проекта>
+python3 <toolkit>/scripts/init_project.py --dry-run   # что нашёл: ядро, кастомные слои, свой код
+python3 <toolkit>/scripts/init_project.py             # записать phpstan.neon (существующий не тронет)
+```
+Скрипт сам находит ядро, кастомные слои и свой код и включает **только существующие** пути.
+
+Остальные конфиги копируются как есть:
+```bash
 cp core/linters/phpcs.xml.dist          <проект>/phpcs.xml
 cp core/linters/.php-cs-fixer.dist.php  <проект>/.php-cs-fixer.dist.php
 cp core/linters/rector.php              <проект>/rector.php
 ```
 
-## Шаг 3. Версионный стек (ключ к корректности)
-`config/version-stack.toml`:
-- `[php].version` — 8.2/8.3 (таргет Rector/PHPStan).
-- `[bitrix].core_path` — путь к **реальному ядру проекта** → PHPStan `scanDirectories` → ловит «метода нет в этой версии».
-- `[bitrix].core_modified = true` — если ядро правлено (см. `core/skills/bitrix-dev/references/custom-core.md`).
-- `[conventions].legacy_required` — где D7-обёрток нет и legacy-API обязателен (чтобы линтер/агент не «исправлял»).
-
-Сгенерировать аннотации ORM под свою версию:
+Расширения PHPStan подключаются **сами** (вручную `includes` не прописывать):
 ```bash
-php bitrix/modules/main/cli.php orm annotate     # → orm_annotations.php (в scanFiles phpstan.neon)
+composer require --dev phpstan/extension-installer phpstan/phpstan \
+    phpstan/phpstan-deprecation-rules phpstan/phpstan-strict-rules
+```
+
+Аннотации ORM под свою версию (опционально, убирает часть ложных срабатываний):
+```bash
+php bitrix/modules/main/cli.php orm annotate     # → orm_annotations.php
 ```
 
 ---

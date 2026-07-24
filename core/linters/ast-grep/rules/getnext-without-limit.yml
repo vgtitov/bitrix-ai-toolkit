@@ -1,0 +1,13 @@
+id: bitrix-getlist-without-limit
+language: php
+severity: warning
+message: "GetList без навигации/лимита — на большом инфоблоке это выборка всей таблицы."
+note: >
+  Четвёртый аргумент CIBlockElement::GetList — навигация (nPageSize/nTopCount). false = «без ограничения»,
+  то есть полный скан. На каталоге в десятки тысяч элементов это тяжёлый запрос и рост памяти.
+  Правильно: ['nPageSize' => N] для постраничной или ['nTopCount' => N], если нужны первые N.
+  См. skills/bitrix-performance/references/queries-and-orm.md
+rule:
+  any:
+    - pattern: CIBlockElement::GetList($O, $F, $G, false, $S)
+    - pattern: CIBlockElement::GetList($O, $F, false, false, $S)
