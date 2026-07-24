@@ -18,6 +18,8 @@ import re
 import sys
 
 LOOP_RE = re.compile(r'\b(while|for|foreach)\b\s*\(', re.IGNORECASE)
+# <<<LABEL / <<<"LABEL" / <<<'LABEL'  до конца строки
+HEREDOC_START_RE = re.compile(r"<<<[ \t]*(?P<q>['\"]?)(?P<label>[A-Za-z_]\w*)(?P=q)[ \t]*\r?\n")
 DB_CALL_RE = re.compile(
     r'(::GetList\s*\(|->GetList\s*\(|::getList\s*\(|->getList\s*\('
     r'|\$DB\s*->\s*Query\s*\(|\$DB\s*->\s*Fetch\s*\(|->GetNextElement\s*\('
@@ -52,6 +54,19 @@ def strip_noise(src: str) -> str:
             j = src.find('\n', i)
             j = n if j == -1 else j
             out.append(' ' * (j - i)); i = j; continue
+        # heredoc / nowdoc: <<<ID … ID;  и  <<<'ID' … ID;
+        # Без этого непарная фигурная скобка внутри текста сдвигает баланс и «закрывает» тело
+        # цикла раньше времени → реальный N+1 после неё молча пропускается.
+        if src[i:i + 3] == '<<<':
+            m = HEREDOC_START_RE.match(src, i)
+            if m:
+                label = m.group('label')
+                body_start = m.end()
+                end_re = re.compile(r'^[ \t]*' + re.escape(label) + r'\b', re.MULTILINE)
+                em = end_re.search(src, body_start)
+                j = em.end() if em else n
+                out.append(''.join(ch if ch == '\n' else ' ' for ch in src[i:j])); i = j; continue
+
         if c in ('"', "'"):
             q = c; j = i + 1
             while j < n:

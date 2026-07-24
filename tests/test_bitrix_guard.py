@@ -62,9 +62,17 @@ def test_no_duplicate_hits():
     assert len(hits) == 1, f"ожидалась 1 находка, получено {len(hits)}: {hits}"
 
 
+# DISCIPLINE_ALLOW_TEST_EDIT — новый тест на скрытый дефект (heredoc прятал реальный N+1)
+def test_heredoc_does_not_hide_findings():
+    """Непарная фигурная скобка в heredoc/nowdoc сдвигала баланс и «закрывала» тело цикла раньше —
+    реальный N+1 после неё МОЛЧА пропускался (ложноотрицательное, самый опасный класс)."""
+    hits = _hits("n1_heredoc.php")
+    assert len(hits) == 2, f"оба N+1 должны быть найдены, получено {len(hits)}: {hits}"
+
+
 def _run():
     tests = [test_bad_detected, test_good_clean, test_string_literal_not_flagged, test_exit_code,
-             test_alt_syntax_detected, test_no_duplicate_hits]
+             test_alt_syntax_detected, test_no_duplicate_hits, test_heredoc_does_not_hide_findings]
     failed = 0
     for t in tests:
         try:

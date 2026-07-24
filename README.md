@@ -66,7 +66,8 @@ bitrix-ai-toolkit/
 ## Поддерживаемые агенты
 **Из коробки `build.sh` собирает три:** **Claude Code** (эталон: `CLAUDE.md` + скиллы + хуки + MCP),
 **Codex** и **Gemini CLI** (через `AGENTS.md` — его многие агенты читают нативно).
-**Cursor, Copilot, Cline** — через генератор `rulesync` (`npm i -g rulesync`, в toolkit не входит).
+**Cursor, Copilot, Cline** — `npm i -g rulesync && sh build.sh` (конфиг `.rulesync/` уже в репозитории,
+наполняется из ядра автоматически).
 **Windsurf, Aider** — вручную, буквально один файл. Подробно и честно: `adapters/README.md`.
 Общий слой (правила, знания, проверки, MCP-профиль) — один на всех.
 

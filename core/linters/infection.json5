@@ -1,0 +1,48 @@
+{
+    // Infection — мутационное тестирование: вносит мелкие правки в код и проверяет, ЗАМЕТЯТ ли это тесты.
+    // Зачем: покрытие в процентах врёт. Тест, который вызывает метод и ничего не проверяет, даёт 100% покрытия
+    // и ловит ноль ошибок. MSI (Mutation Score Indicator) показывает, сколько мутаций тесты реально убили.
+    //
+    // Установка:  composer require --dev infection/infection
+    // Нужен драйвер покрытия: pcov (быстрее) или Xdebug.
+    // Прогон:     vendor/bin/infection --configuration=core/linters/infection.json5 --threads=4
+    //
+    // Опционален (как все проверки). Имеет смысл ТОЛЬКО там, где тесты уже есть — на доменном слое
+    // (см. core/skills/bitrix-dev/references/testability.md: «покрывать не проект, а деньги»).
+
+    "$schema": "vendor/infection/infection/resources/schema.json",
+
+    "source": {
+        "directories": [
+            // Только СВОЙ код, который вообще тестируем. Компоненты/шаблоны/ядро сюда не попадают:
+            // они не покрыты юнит-тестами по природе, мутировать их бессмысленно.
+            "local/classes"
+        ],
+        "excludes": [
+            "vendor",
+            "bitrix"
+        ]
+    },
+
+    "logs": {
+        "text": "build/infection/infection.log",
+        "summary": "build/infection/summary.log"
+    },
+
+    "tmpDir": "build/infection/tmp",
+
+    // Пороги. Начинать НИЗКО и поднимать: заваленный порог на старте демотивирует и проверку выключат.
+    // minMsi        — доля убитых мутаций от всех
+    // minCoveredMsi — то же, но только по покрытому коду (честнее для проекта с частичным покрытием)
+    "minMsi": 40,
+    "minCoveredMsi": 60,
+
+    "mutators": {
+        "@default": true,
+
+        // Отключено осознанно — на Битрикс-коде даёт шум:
+        // мутации приводят к «падению» из-за окружения, а не из-за логики.
+        "IdenticalEqual": false,
+        "NotIdenticalNotEqual": false
+    }
+}
