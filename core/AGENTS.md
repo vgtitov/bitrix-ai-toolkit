@@ -20,6 +20,17 @@
 
 ## Главное правило: спроси инструмент, не угадывай
 Модель врёт в деталях API Битрикс (два ядра, много legacy, неполная `api_d7`). Источник истины — реальный код и справка:
+
+**Официальная документация локально** (подтянуть: `sh scripts/fetch_official_docs.sh`) — `bitrix-tools/framework-docs`
+(MIT) в `.ai/framework-docs/pages/`: `orm`, `security` (sql-injection, xss, csrf-ssrf, sanitizer, cipher…),
+`performance` (caching, query-optimization, composite-site, clustering), `database/sql-tracker`, `advanced/{debug,logger,http-client}`.
+**Ищи грепом по ней прежде, чем отвечать по памяти:**
+```bash
+rg -n "setPrivateIp|SSRF"        .ai/framework-docs/pages/security
+rg -n "registerTag|TaggedCache"  .ai/framework-docs/pages/performance
+```
+Если утверждение не подтверждено ни кодом ядра, ни этой документацией — помечай **[проверить]**.
+
 - **Перед написанием** — найди как уже сделано: поиск по `/local` и по ядру (Grep/ripgrep, символьно — Serena
   `find_symbol`). Сигнатуры классов ядра — по реальному коду в `vendor/bitrix-toolkit/bitrix-ci` или стабам
   `matiaspub/bxApiDocs`; справка — dev.1c-bitrix.ru. **Не по памяти.**

@@ -35,3 +35,6 @@ __pycache__/
 # Персональные конфиги (создаются onboard из *.example.*)
 /config/checks.toml
 /config/version-stack.toml
+
+# Внешние официальные источники (клонируются scripts/fetch_official_docs.sh)
+/.ai/

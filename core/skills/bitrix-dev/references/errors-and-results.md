@@ -57,10 +57,17 @@ public function __construct(
     private readonly OrderRepository $orders,
     private readonly \Psr\Log\LoggerInterface $logger,   // ← PSR-3, не AddMessage2Log
 ) {}
+
+// создание — по официальной документации (pages/advanced/logger.md)
+$logger = \Bitrix\Main\Diag\Logger::create('myClassLogger', [$this]);
 ```
-Реализация — `\Bitrix\Main\Diag\FileLogger` (без внешних зависимостей, настройка в `.settings_extra.php`) или Monolog
-(если нужны Sentry/ELK/Telegram). `AddMessage2Log()` — годится для быстрой отладки, но **не как архитектура**
-(нет уровней, контекста, хендлеров). Контекст структурированный: `['orderId' => $id, 'exception' => $e]`.
+Битрикс реализует **PSR-3**: `\Bitrix\Main\Diag\Logger` — базовый класс, есть файловый логгер; логгер настраивается,
+в т.ч. для `AddMessage2Log`. В своём коде инъектируй `LoggerInterface`, не зови глобальные функции из бизнес-логики.
+Monolog — не по умолчанию, а как PSR-3-реализация **за** `LoggerInterface`, когда нужны sink'и, которых нет в ядре.
+Контекст структурированный: `['orderId' => $id, 'exception' => $e]`.
+
+`[проверить]` В свежих сборках возможен `Diag\LoggerFactory::createById(...)` (упоминается в `bitrix-tools/best-practice`)
+с признанием `Logger::create()` устаревшим — **сверься с `bitrix/modules/main/lib/diag/` своей версии**.
 Уровни: `error` — сломалось и нужен человек · `warning` — деградация/ретрай · `info` — бизнес-факт · `debug` — только стенд.
 ПДн и секреты не логировать; `#[\SensitiveParameter]` (8.2) маскирует значение в стектрейсе.
 

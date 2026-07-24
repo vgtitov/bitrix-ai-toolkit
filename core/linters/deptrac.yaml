@@ -1,0 +1,47 @@
+# deptrac — контроль слоёв. То, чего PHPStan НЕ ловит: «домен не должен знать про Битрикс».
+# Установка:  composer require --dev deptrac/deptrac
+# Прогон:     vendor/bin/deptrac analyse -c core/linters/deptrac.yaml
+# Опционален (как все проверки): не установлен → шаг пропускается.
+#
+# ⚠️ Работает по namespace → покрывает только PSR-4-код в /local/classes и /local/modules.
+# Процедурные init.php/template.php он не видит — это и есть измеримый аргумент «выноси логику в классы».
+
+deptrac:
+  paths:
+    - local/classes
+    - local/modules
+
+  layers:
+    - name: Presentation
+      collectors:
+        - type: className
+          value: '^Local\\.*\\(Controller|Presentation)\\.*'
+    - name: Application
+      collectors:
+        - type: className
+          value: '^Local\\.*\\Application\\.*'
+    - name: Domain
+      collectors:
+        - type: className
+          value: '^Local\\.*\\Domain\\.*'
+    - name: Infrastructure
+      collectors:
+        - type: className
+          value: '^Local\\.*\\Infrastructure\\.*'
+    - name: BitrixCore
+      collectors:
+        - type: className
+          value: '^Bitrix\\.*'
+        - type: className
+          value: '^C[A-Z].*'          # старое ядро: CIBlockElement, CSaleOrder, CFile…
+
+  ruleset:
+    # Presentation знает про приложение, домен и ядро (это граница системы)
+    Presentation: [Application, Domain, BitrixCore]
+    # Приложение оркеструет домен; ядро — только через порты (транзакции — исключение, см. ниже)
+    Application:  [Domain, BitrixCore]
+    # Инфраструктура реализует порты домена поверх ядра
+    Infrastructure: [Domain, BitrixCore]
+    # ДОМЕН НЕ ЗНАЕТ НИЧЕГО — ни про Битрикс, ни про инфраструктуру.
+    # Это и есть условие тестируемости без ядра и переносимости при смене API.
+    Domain: ~

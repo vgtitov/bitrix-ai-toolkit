@@ -1,0 +1,44 @@
+# Декларативный запрет вызовов — лучший ROI: детерминированно ловит то, что иначе держится «на честном слове».
+# Установка:  composer require --dev phpstan/extension-installer spaze/phpstan-disallowed-calls
+# Подключение: добавь этот файл в includes: своего phpstan.neon
+# Опционален: не установлен → PHPStan работает без этих правил.
+
+parameters:
+  disallowedStaticCalls:
+    - method: 'CModule::IncludeModule()'
+      message: 'в новом коде — \Bitrix\Main\Loader::includeModule()'
+
+  disallowedFunctionCalls:
+    # Отладочный мусор не должен уезжать в прод
+    - function: ['var_dump()', 'print_r()', 'dd()', 'dump()', 'var_export()']
+      message: 'отладочный вывод: убери или используй \Bitrix\Main\Diag\Debug::dumpToFile()'
+      allowIn: ['tests/*', '*/tests/*']
+    - function: ['eval()', 'exec()', 'shell_exec()', 'system()', 'passthru()']
+      message: 'опасный вызов: обоснуй или убери'
+
+    # Экранирование — битриксовое (учитывает кодировку сайта)
+    - function: 'htmlspecialchars()'
+      message: 'в Битрикс — htmlspecialcharsbx()'
+
+    # Исходящий HTTP — через штатный клиент (таймауты + setPrivateIp(false) против SSRF)
+    - function: ['curl_exec()', 'curl_init()']
+      message: 'исходящий HTTP → \Bitrix\Main\Web\HttpClient (таймауты, setPrivateIp(false) против SSRF)'
+    - function: 'file_get_contents()'
+      message: 'для HTTP — \Bitrix\Main\Web\HttpClient; для файлов допустимо (добавь в allowIn свой путь)'
+      allowParamsAnywhere:
+        - position: 1
+          value: '/^(?!https?:\/\/).*/'   # локальные пути разрешены, URL — нет
+
+    # Логирование из бизнес-логики
+    - function: 'AddMessage2Log()'
+      message: 'в сервисах — инъекция \Psr\Log\LoggerInterface; AddMessage2Log — legacy/отладка'
+      allowIn: ['local/php_interface/*']
+
+    # Подавление ошибок
+    - function: 'error_reporting()'
+      message: 'не менять уровень ошибок из кода — это настройка окружения (.settings.php)'
+
+  disallowedSuperglobals:
+    - superglobal: '$GLOBALS'
+      message: 'глобальное состояние: передавай зависимости явно'
+      allowIn: ['local/php_interface/*', 'local/components/*']

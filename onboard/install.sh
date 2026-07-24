@@ -93,7 +93,17 @@ cat <<'NEXT'
      warn  — ДЕФОЛТ: показать проблемы, НЕ блокировать (AI сообщает и предлагает фикс)
      block — строгий гейт: AI обязан починить до завершения; pre-commit останавливает коммит
 
+  СИЛЬНО РЕКОМЕНДУЕТСЯ (агент отвечает по первоисточнику, а не по памяти):
+  0. sh scripts/fetch_official_docs.sh      # официальная дока Битрикс (MIT) в .ai/framework-docs
+                                            # затем: rg -n "TaggedCache" .ai/framework-docs/pages/performance
+
   ОПЦИОНАЛЬНО:
+  3b. Доп. проверки (все опциональны, ставятся в проект):
+     composer require --dev deptrac/deptrac                       # контроль слоёв (домен не знает Битрикс)
+     composer require --dev phpstan/extension-installer spaze/phpstan-disallowed-calls
+     composer require --dev roave/security-advisories:dev-latest  # уязвимые версии не установятся
+     composer audit --locked                                      # встроено в Composer 2.4+
+     конфиги: core/linters/{deptrac.yaml, disallowed-calls.neon}
   4. Language Server агенту (навигация+диагностики): docs/language-server.md
      npm i -g intelephense && claude mcp add php-lsp -- mcp-language-server --workspace "$PWD" --lsp intelephense -- --stdio
   5. Проверки в Docker (без локальной установки PHP): docker/ — docker compose -f docker/docker-compose.yml run --rm checks
