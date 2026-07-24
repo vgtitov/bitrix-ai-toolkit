@@ -90,6 +90,13 @@ def detect(project, cfg):
         if os.path.isdir(os.path.join(project, p)):
             found["own"].append(p)
 
+    if tomllib is None:
+        found["notes"].append(
+            "Python < 3.11: модуля tomllib нет → version-stack.toml НЕ ПРОЧИТАН. "
+            "Кастомные слои и путь к ядру не будут учтены. Обнови Python до 3.11+ "
+            "или задай пути вручную в сгенерированном конфиге."
+        )
+
     ext_installed = os.path.isdir(os.path.join(project, "vendor", "phpstan", "extension-installer"))
     found["extension_installer"] = ext_installed
     if not ext_installed:
@@ -111,8 +118,15 @@ def render(found, level):
         "",
         "    paths:",
     ]
-    for p in found["own"] or ["local"]:
-        lines.append(f"        - {p}")
+    if found["own"]:
+        for p in found["own"]:
+            lines.append(f"        - {p}")
+    else:
+        # Ничего не нашли — НЕ выдумываем путь: несуществующий paths уронит PHPStan
+        # («Path ... does not exist») ровно так же, как это делал статический образец.
+        lines.append("        # ⚠️ Свой код не найден (искали: " + ", ".join(OWN_CODE) + ").")
+        lines.append("        # Укажи путь вручную, иначе PHPStan упадёт на несуществующем каталоге:")
+        lines.append("        # - local/classes")
 
     if found["custom_layers"]:
         lines += ["", "    # Кастомные слои (свой фреймворк) — ВИДНЫ анализатору, но не анализируются:",

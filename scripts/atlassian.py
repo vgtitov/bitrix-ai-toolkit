@@ -103,6 +103,12 @@ def _req(kind: str, path: str, payload=None, method: str | None = None):
         raise SystemExit(f"[atlassian] ответ не JSON — вероятно, страница логина вместо API.\n  URL: {url}")
 
 
+def _cql_str(value: str) -> str:
+    """Экранировать значение для подстановки в CQL-строку.
+    Без этого кавычка в заголовке ломает запрос (и в принципе позволяет его переписать)."""
+    return str(value).replace("\\", "\\\\").replace('"', '\\"')
+
+
 def html_to_text(s: str) -> str:
     """view/storage-HTML → плоский текст (грубо, для чтения агентом)."""
     s = re.sub(r"<(script|style)\b.*?</\1>", " ", s or "", flags=re.S | re.I)
@@ -176,7 +182,7 @@ def conf_page_id(ref: str) -> str:
     m = re.search(r"pageId=(\d+)", ref) or re.search(r"/pages/(\d+)", ref)
     if m:
         return m.group(1)
-    q = urllib.parse.urlencode({"cql": f'title = "{ref}"', "limit": "1"})
+    q = urllib.parse.urlencode({"cql": f'title = "{_cql_str(ref)}"', "limit": "1"})
     res = _req("CONFLUENCE", f"/rest/api/content/search?{q}").get("results") or []
     if not res:
         raise SystemExit(f"Страница не найдена: {ref}")
@@ -314,7 +320,7 @@ def conf_publish(path: str, parent: str, title: str | None, dry: bool) -> int:
         return 0
     parent_id = conf_page_id(parent)
     space = (_req("CONFLUENCE", f"/rest/api/content/{parent_id}?expand=space").get("space") or {}).get("key")
-    q = urllib.parse.urlencode({"cql": f'space = "{space}" and title = "{title}"', "limit": "1"})
+    q = urllib.parse.urlencode({"cql": f'space = "{_cql_str(space)}" and title = "{_cql_str(title)}"', "limit": "1"})
     hit = _req("CONFLUENCE", f"/rest/api/content/search?{q}").get("results") or []
     if hit:
         pid = hit[0]["id"]

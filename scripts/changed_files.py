@@ -64,12 +64,14 @@ def _git(args, cwd):
 
 def changed(base, cwd):
     """Изменённые файлы относительно base. staged = --cached, иначе diff с base."""
+    # -z: имена через NUL и без экранирования. Иначе git отдаёт не-ASCII пути как "\321\204…"
+    # (core.quotepath=true) и они не совпадают с реальными именами → файлы молча выпадают из проверки.
     if base == "staged":
-        out = _git(["diff", "--cached", "--name-only", "--diff-filter=ACM"], cwd)
+        out = _git(["diff", "--cached", "--name-only", "--diff-filter=ACM", "-z"], cwd)
     else:
-        out = _git(["diff", "--name-only", "--diff-filter=ACM", base + "...HEAD"], cwd) \
-            or _git(["diff", "--name-only", "--diff-filter=ACM", base], cwd)
-    return [line.strip() for line in out.splitlines() if line.strip()]
+        out = _git(["diff", "--name-only", "--diff-filter=ACM", "-z", base + "...HEAD"], cwd) \
+            or _git(["diff", "--name-only", "--diff-filter=ACM", "-z", base], cwd)
+    return [n for n in out.split("\0") if n.strip()]
 
 
 def walk(paths, cwd):

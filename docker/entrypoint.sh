@@ -40,7 +40,9 @@ run_guard() {
   files=$(php_files)
   [ -z "$files" ] && { echo "  нет изменённых .php (профиль «только изменённое») — пропуск"; return 0; }
   # shellcheck disable=SC2086
-  if ! echo "$files" | xargs python3 "$TK/scripts/bitrix_guard.py"; then
+  # -d "\n": пути с пробелами не должны разрываться на части
+  if ! printf '%s\n' "$files" | xargs -d '\n' python3 "$TK/scripts/bitrix_guard.py" 2>/dev/null \
+     || ! printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 python3 "$TK/scripts/bitrix_guard.py"; then
     [ "$m" = "block" ] && rc_total=1 || echo "  (warn — не блокирует)"
   fi
 }

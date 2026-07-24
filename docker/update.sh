@@ -14,6 +14,10 @@ set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 WHAT="${1:-all}"
+case "$WHAT" in
+  image|docs|all) ;;
+  *) echo "неизвестный аргумент: $WHAT"; echo "usage: sh docker/update.sh [all|image|docs]"; exit 2 ;;
+esac
 say() { printf "\n\033[36m[update] %s\033[0m\n" "$1"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 

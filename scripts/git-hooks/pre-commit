@@ -5,7 +5,11 @@
 # Глобально выключить: BITRIX_AI_CHECKS=off. Аналог bsl-guard из bsl-ai-toolkit, но опциональный.
 # Кроссплатформенно (sh; на Windows — git-bash). Явно указать toolkit — env BITRIX_TOOLKIT_DIR.
 
-files=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -iE '\.php$' | grep -ivE '/(vendor|bitrix)/')
+# -z: имена через NUL и БЕЗ экранирования. Без него git отдаёт не-ASCII пути в кавычках
+# и в виде \321\204… (core.quotepath=true по умолчанию) — тогда фильтр по '.php$' не срабатывает
+# и файлы с кириллицей в пути МОЛЧА не проверяются. Проверено.
+files=$(git diff --cached --name-only --diff-filter=ACM -z 2>/dev/null \
+  | tr '\0' '\n' | grep -iE '\.php$' | grep -ivE '/(vendor|bitrix)/')
 [ -z "$files" ] && exit 0
 
 tk=""
@@ -24,7 +28,8 @@ mode=$("$py" "$tk/scripts/checks_config.py" n1_guard 2>/dev/null)
 [ "$mode" = "off" ] && exit 0
 
 # shellcheck disable=SC2086
-out=$(echo "$files" | xargs "$py" "$tk/scripts/bitrix_guard.py" 2>/dev/null)
+# -0 через tr: пути с пробелами не разрываются (BSD xargs не знает -d)
+out=$(printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 "$py" "$tk/scripts/bitrix_guard.py" 2>/dev/null)
 rc=$?
 [ "$rc" -eq 0 ] && exit 0   # находок нет
 

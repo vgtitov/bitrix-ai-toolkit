@@ -39,7 +39,10 @@ bitrix-ai-toolkit/
 │   └── README.md             #   codex/gemini (фолбэк) · cursor/copilot/cline/windsurf/aider (rulesync/ручные)
 ├── build.sh                  # генерация конфигов из core/ (rulesync + фолбэк): CLAUDE.md, AGENTS.md, .mcp.json, .claude/
 ├── config/                   # локализация: version-stack.toml (версии PHP/ядра/модулей, legacy_required)
-├── scripts/                  # bitrix_guard.py (детектор N+1) · install_git_hooks.py · git-hooks/ (commit-msg, pre-commit)
+├── scripts/                  # init_project.py (конфиг под проект) · posttool_lint.py (хук линтеров)
+│                             #   bitrix_guard.py (N+1) · changed_files.py (только изменённое)
+│                             #   checks_config.py (режимы) · install_git_hooks.py · git-hooks/
+│                             #   fetch_official_docs.sh (офиц. дока) · atlassian.py (Jira/Confluence)
 ├── onboard/install.sh        # идемпотентная автоустановка: инструменты + хуки + скиллы + сборка + самотест
 ├── tests/                    # функциональные тесты (test_bitrix_guard.py + фикстуры)
 ├── demo/                     # SETUP.md (развернуть демо за вечер)
