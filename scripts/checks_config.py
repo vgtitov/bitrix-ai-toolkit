@@ -58,12 +58,32 @@ def effective_mode(check_name):
     if not cfg:
         return DEFAULT
 
-    section = cfg.get("checks", {}).get(check_name, {})
-    if section.get("enabled") is False:
-        return "off"
-    mode = section.get("mode") or cfg.get("mode", {}).get("default") or DEFAULT
-    mode = str(mode).strip().lower()
-    return mode if mode in VALID else DEFAULT
+    # Конфиг пишет человек — форма может быть любой. Например естественное сокращение
+    #   [checks]\n n1_guard = "block"   → section окажется строкой, а не таблицей.
+    # Докстринг обещает «никогда не падает», поэтому любую неожиданную форму трактуем мягко.
+    try:
+        checks = cfg.get("checks")
+        checks = checks if isinstance(checks, dict) else {}
+        section = checks.get(check_name)
+
+        if isinstance(section, str):        # [checks] n1_guard = "block"
+            mode = section
+        elif isinstance(section, dict):
+            if section.get("enabled") is False:
+                return "off"
+            mode = section.get("mode")
+        else:
+            mode = None
+
+        if not mode:
+            default_tbl = cfg.get("mode")
+            default_tbl = default_tbl if isinstance(default_tbl, dict) else {}
+            mode = default_tbl.get("default") or DEFAULT
+
+        mode = str(mode).strip().lower()
+        return mode if mode in VALID else DEFAULT
+    except Exception:
+        return DEFAULT
 
 
 def _merge(a, b):

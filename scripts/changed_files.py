@@ -99,11 +99,18 @@ def main(argv=None):
     changed_only = scope.get("changed_only", True)
     base = args.base or scope.get("diff_base", "staged")
 
+    is_git = bool(_git(["rev-parse", "--is-inside-work-tree"], cwd).strip())
+
     if args.all or not changed_only:
+        files = walk(paths, cwd)
+    elif not is_git:
+        # НЕ git-репозиторий → diff взять неоткуда. Молча отдать пусто нельзя: проверки бы
+        # «прошли», не проверив ничего. Поэтому фолбэк на обход scope.paths (как обещает докстринг).
+        print("changed_files: не git-репозиторий — проверяю scope.paths целиком", file=sys.stderr)
         files = walk(paths, cwd)
     else:
         files = changed(base, cwd)
-        if not files:                      # не git/нет изменений → тихо ничего не проверяем
+        if not files:                      # git есть, изменений нет → проверять нечего (это норма)
             return 0
         # оставляем только то, что попадает в scope.paths
         if paths and paths != ["."]:

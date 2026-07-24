@@ -24,6 +24,7 @@ clone_or_pull() { # url dir name
     say "$name — клонирую"; git clone --depth 1 -q "$url" "$dir" || echo "  ! не удалось склонировать $url"
   fi
   [ -d "$dir" ] && echo "  → $dir"
+  return 0   # под set -e функция НЕ должна возвращать 1, иначе скрипт умрёт на первой неудаче
 }
 
 case "$WHAT" in

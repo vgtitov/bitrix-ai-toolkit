@@ -65,11 +65,22 @@ def strip_noise(src: str) -> str:
     return ''.join(out)
 
 
+ALT_END = {"while": "endwhile", "for": "endfor", "foreach": "endforeach"}
+
+
 def find_loop_bodies(clean: str):
-    """Вернуть список (start_idx, end_idx) тел циклов (внутри { }) по огрублённому исходнику."""
+    """Вернуть список (start_idx, end_idx) тел циклов по огрублённому исходнику.
+
+    Поддерживаются ОБА синтаксиса:
+      • фигурные скобки:      foreach (...) { ... }
+      • альтернативный:       foreach (...): ... endforeach;
+    Альтернативный доминирует в шаблонах компонентов Битрикс (template.php), где N+1 встречается
+    чаще всего — без него детектор слеп именно там, где нужнее всего.
+    """
     bodies = []
     for m in LOOP_RE.finditer(clean):
-        # найти открывающую { после условия цикла
+        kw = m.group(1).lower()
+        # пройти условие цикла до закрывающей ')'
         p = m.end()
         depth = 1  # мы уже внутри первой '(' условия
         while p < len(clean) and depth > 0:
@@ -78,34 +89,54 @@ def find_loop_bodies(clean: str):
             elif clean[p] == ')':
                 depth -= 1
             p += 1
-        # пропустить пробелы до '{'
         while p < len(clean) and clean[p] in ' \t\r\n':
             p += 1
-        if p >= len(clean) or clean[p] != '{':
-            continue  # однострочный цикл без блока — пропускаем (редко и без вложенных вызовов)
-        start = p + 1
-        bdepth = 1
-        p = start
-        while p < len(clean) and bdepth > 0:
-            if clean[p] == '{':
-                bdepth += 1
-            elif clean[p] == '}':
-                bdepth -= 1
-            p += 1
-        bodies.append((start, p))
+        if p >= len(clean):
+            continue
+
+        if clean[p] == '{':
+            start = p + 1
+            bdepth = 1
+            p = start
+            while p < len(clean) and bdepth > 0:
+                if clean[p] == '{':
+                    bdepth += 1
+                elif clean[p] == '}':
+                    bdepth -= 1
+                p += 1
+            bodies.append((start, p))
+        elif clean[p] == ':':
+            # альтернативный синтаксис: тело до соответствующего endforeach/endfor/endwhile
+            start = p + 1
+            end_kw = ALT_END.get(kw)
+            if not end_kw:
+                continue
+            end_re = re.compile(r'\b' + end_kw + r'\b', re.IGNORECASE)
+            em = end_re.search(clean, start)
+            bodies.append((start, em.start() if em else len(clean)))
+        # иначе — однострочный цикл без блока: пропускаем
     return bodies
 
 
 def scan_source(src: str):
-    """Вернуть список номеров строк (1-based) с БД-вызовом внутри тела цикла."""
+    """Вернуть список (номер строки, фрагмент) с БД-вызовом внутри тела цикла.
+
+    Вложенные циклы дают перекрывающиеся тела → одна и та же находка попадалась несколько раз.
+    Дедуплицируем по позиции. splitlines() считаем один раз (было O(n²) на больших файлах).
+    """
     clean = strip_noise(src)
+    lines = src.splitlines()
+    seen = set()
     hits = []
     for (s, e) in find_loop_bodies(clean):
         for m in DB_CALL_RE.finditer(clean, s, e):
+            if m.start() in seen:
+                continue
+            seen.add(m.start())
             line = clean.count('\n', 0, m.start()) + 1
-            snippet = src.splitlines()[line - 1].strip() if line - 1 < len(src.splitlines()) else ''
+            snippet = lines[line - 1].strip() if line - 1 < len(lines) else ''
             hits.append((line, snippet))
-    return hits
+    return sorted(hits)
 
 
 def main(argv):

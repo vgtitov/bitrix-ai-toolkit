@@ -4,9 +4,14 @@
 # Запуск:   docker compose -f docker/docker-compose.yml run --rm checks
 # Проверить конкретный путь: docker compose -f docker/docker-compose.yml run --rm checks check local/
 #
-# Переменные (.env рядом или окружение):
-#   PROJECT_DIR       — путь к проекту Битрикс на хосте (монтируется в /work). По умолчанию — текущий каталог.
-#   BITRIX_AI_CHECKS  — глобальный режим проверок: off | warn | block (по умолчанию warn — не блокирует).
+# Переменные (окружение или .env рядом с этим файлом):
+#   PROJECT_DIR       — ОБЯЗАТЕЛЬНО: АБСОЛЮТНЫЙ путь к проекту Битрикс на хосте (монтируется в /work).
+#                       ⚠️ Относительные пути в compose резолвятся от каталога docker/, а НЕ от того,
+#                       откуда ты запускаешь команду — поэтому значение по умолчанию тут опасно
+#                       (смонтировался бы чужой каталог). Задавай явно:
+#                          PROJECT_DIR=$(pwd) docker compose -f docker/docker-compose.yml run --rm checks
+#   BITRIX_AI_CHECKS  — режим проверок: off | warn | block (по умолчанию warn — не блокирует).
+#   CHECKS_CONFIG     — АБСОЛЮТНЫЙ путь к своему checks.toml (опционально).
 services:
   checks:
     build:
@@ -14,10 +19,9 @@ services:
       dockerfile: docker/Dockerfile
     image: bitrix-ai-toolkit/checks:latest
     volumes:
-      # Код проекта — read-write только если нужен авто-фикс стиля; для чистой проверки достаточно :ro
-      - "${PROJECT_DIR:-../..}:/work"
-      # Свой конфиг опциональности проверок (перекрывает дефолты toolkit)
-      - "${CHECKS_CONFIG:-../config/checks.example.toml}:/toolkit/config/checks.toml:ro"
+      # Код проекта. Без PROJECT_DIR compose остановится с понятной ошибкой — это осознанно:
+      # лучше явная ошибка, чем молча проверить не тот каталог.
+      - "${PROJECT_DIR:?укажи АБСОЛЮТНЫЙ путь к проекту, напр. PROJECT_DIR=$(pwd)}:/work"
     environment:
       BITRIX_AI_CHECKS: "${BITRIX_AI_CHECKS:-warn}"
     working_dir: /work

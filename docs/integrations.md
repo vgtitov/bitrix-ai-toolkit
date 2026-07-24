@@ -9,10 +9,10 @@
 ```bash
 python3 scripts/atlassian.py jira issue PROJ-123 --comments
 python3 scripts/atlassian.py jira search "project = PROJ AND status = Done" --limit 10
-python3 scripts/atlassian.py conf page 209491238           # id, URL или точный заголовок
-python3 scripts/atlassian.py conf tree 148810173 --depth 2
+python3 scripts/atlassian.py conf page 123456789           # id, URL или точный заголовок
+python3 scripts/atlassian.py conf tree 987654321 --depth 2
 python3 scripts/atlassian.py conf search "критерии приёмки"
-python3 scripts/atlassian.py conf publish docs/page.md --parent 209491237   # нужен токен с записью
+python3 scripts/atlassian.py conf publish docs/page.md --parent 123456780   # нужен токен с записью
 ```
 
 Настройка (`config/local/.env` или окружение):

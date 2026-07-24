@@ -21,7 +21,10 @@ composer.lock
 /.phpstan/
 
 # Локализация под конкретную организацию (не в публичное ядро)
-/skills/*/references/local/
+# ВАЖНО: config/local/ — слой компании (креды, версии, конвенции). В публичный репо не попадает.
+config/local/*
+!config/local/.gitkeep
+core/skills/*/references/local/
 /config/*.local.*
 
 # ОС

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Поставить глобальные git-хуки bitrix-ai-toolkit:
+"""Поставить git-хуки bitrix-ai-toolkit (ПО УМОЛЧАНИЮ — только в текущий репозиторий):
   - commit-msg — срезает соавторство/атрибуцию Claude/Anthropic из сообщений коммитов;
   - pre-commit — bitrix-guard: блокирует staged *.php с обращением к БД в цикле (N+1). В чужих
     репозиториях (нет detector'а) молча пропускает.
@@ -8,8 +8,9 @@ Org-agnostic, идемпотентно, кроссплатформенно, то
   - core.hooksPath: берётся существующий; если не задан — ставится ~/.git-global-hooks.
   - копирует scripts/git-hooks/* в этот каталог; чужой commit-msg НЕ затирает (предупреждает).
 
-Запуск:  python scripts/install_git_hooks.py
-Опции:   --local  — поставить хуки ТОЛЬКО в текущий репозиторий (.git/hooks), не трогая глобальный конфиг.
+Запуск:  python scripts/install_git_hooks.py            # локально в этот репозиторий (безопасно)
+Опции:   --global — поставить ГЛОБАЛЬНО (меняет core.hooksPath всей машины, отключит
+         .git/hooks в остальных репозиториях: husky, pre-commit, lefthook)
 """
 import os
 import shutil
@@ -72,7 +73,13 @@ def main(argv):
         print(f"[!] нет каталога с хуками: {SRC}", file=sys.stderr)
         return 1
 
-    local = "--local" in argv
+    # ПО УМОЛЧАНИЮ — ЛОКАЛЬНО, в текущий репозиторий.
+    # Глобальная установка меняет core.hooksPath на ВСЕЙ машине: git перестаёт видеть .git/hooks
+    # во всех остальных репозиториях (husky, pre-commit framework, lefthook, корпоративные хуки
+    # молча отключаются). Это слишком агрессивно для инструмента, который человек просто попробовал.
+    # Глобально — только по явному флагу --global.
+    global_install = "--global" in argv
+    local = not global_install
     if local:
         top = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
         if top.returncode != 0:
@@ -88,6 +95,10 @@ def main(argv):
             print(f"[i] core.hooksPath уже задан: {dst}")
         else:
             dst = Path.home() / ".git-global-hooks"
+            print("[!] ВНИМАНИЕ: глобальная установка меняет core.hooksPath для ВСЕЙ машины.")
+            print("    Git перестанет использовать .git/hooks в ОСТАЛЬНЫХ репозиториях —")
+            print("    husky, pre-commit framework, lefthook и корпоративные хуки отключатся.")
+            print("    Отменить: git config --global --unset core.hooksPath")
             gset("core.hooksPath", dst.as_posix())
             print(f"[i] core.hooksPath → {dst}")
         dst.mkdir(parents=True, exist_ok=True)

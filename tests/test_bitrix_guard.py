@@ -47,8 +47,24 @@ def test_exit_code():
     assert bitrix_guard.main(["prog", os.path.join(FIX, "n1_good.php")]) == 0
 
 
+# DISCIPLINE_ALLOW_TEST_EDIT — добавлены НОВЫЕ тесты на дефекты, найденные adversarial-ревью
+def test_alt_syntax_detected():
+    """Альтернативный синтаксис (foreach: … endforeach) — доминирует в шаблонах компонентов Битрикс,
+    где N+1 встречается чаще всего. Детектор был к нему слеп."""
+    hits = _hits("n1_alt_syntax.php")
+    assert len(hits) >= 3, f"ожидались находки во всех трёх циклах, получено {len(hits)}"
+
+
+def test_no_duplicate_hits():
+    """Вложенные циклы дают перекрывающиеся тела — находка не должна дублироваться."""
+    src = '<?php\nforeach($a as $x){ foreach($b as $y){ $r = CIBlockElement::GetList([]); } }\n'
+    hits = bitrix_guard.scan_source(src)
+    assert len(hits) == 1, f"ожидалась 1 находка, получено {len(hits)}: {hits}"
+
+
 def _run():
-    tests = [test_bad_detected, test_good_clean, test_string_literal_not_flagged, test_exit_code]
+    tests = [test_bad_detected, test_good_clean, test_string_literal_not_flagged, test_exit_code,
+             test_alt_syntax_detected, test_no_duplicate_hits]
     failed = 0
     for t in tests:
         try:
