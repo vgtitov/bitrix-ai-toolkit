@@ -20,8 +20,13 @@ import sys
 LOOP_RE = re.compile(r'\b(while|for|foreach)\b\s*\(', re.IGNORECASE)
 DB_CALL_RE = re.compile(
     r'(::GetList\s*\(|->GetList\s*\(|::getList\s*\(|->getList\s*\('
-    r'|\$DB\s*->\s*Query\s*\(|->GetNextElement\s*\('
-    r'|->GetProperty\s*\(|::GetPropertyValues\s*\(|::GetByID\s*\()',
+    r'|\$DB\s*->\s*Query\s*\(|\$DB\s*->\s*Fetch\s*\(|->GetNextElement\s*\('
+    # свойства/элементы поштучно — классический N+1 в Битрикс (и статически, и через объект)
+    r'|::GetProperty\s*\(|->GetProperty\s*\('
+    r'|::GetPropertyValues\s*\(|->GetPropertyValues\s*\('
+    r'|::GetByID\s*\(|->GetByID\s*\('
+    # ORM-хелперы поштучного получения
+    r'|::getRow\s*\(|->getRow\s*\(|::getById\s*\(|->getById\s*\()',
 )
 
 

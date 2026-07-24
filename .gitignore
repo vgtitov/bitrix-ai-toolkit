@@ -31,3 +31,7 @@ Thumbs.db
 # Python
 __pycache__/
 *.pyc
+
+# Персональные конфиги (создаются onboard из *.example.*)
+/config/checks.toml
+/config/version-stack.toml

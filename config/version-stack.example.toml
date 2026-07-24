@@ -15,6 +15,10 @@ main_version = "24.x"         # версия главного модуля (см
 # Ключевой механизм проверки версий: путь к РЕАЛЬНОМУ ядру ТВОЕЙ версии для scanDirectories PHPStan.
 # PHPStan сам ругается «метода нет в этой версии», а phpstan-deprecation-rules — на устаревшее (@deprecated в ядре).
 core_path = "bitrix/modules"
+# Ядро правлено (не эталонный дистрибутив)? Тогда анализ и сигнатуры — по ФАКТИЧЕСКОМУ коду, а не по докам вендора.
+# Агент помечает такие места [правлено ядро]. Подробно — skills/bitrix-dev/references/custom-core.md
+core_modified = false
+core_patches = "patches/core" # где лежат .patch и REGISTRY.md правок ядра (если core_modified = true)
 
 [modules]
 # Версии ключевых модулей — API отличается между версиями. Заполни фактические (из admin → Обновление системы).

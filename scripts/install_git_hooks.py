@@ -46,6 +46,8 @@ def make_executable(p: Path):
 
 
 def copy_hook(name: str, dst_dir: Path):
+    """Скопировать хук. ЧУЖОЙ существующий хук НИКОГДА не затираем (любой, не только commit-msg):
+    в глобальном каталоге может лежать chain-хук или хук другого toolkit'а — перезапись его сломает."""
     src = SRC / name
     dst = dst_dir / name
     if dst.exists():
@@ -53,8 +55,12 @@ def copy_hook(name: str, dst_dir: Path):
             existing = dst.read_text(encoding="utf-8", errors="replace")
         except OSError:
             existing = ""
-        if MARKER not in existing and name == "commit-msg":
-            print(f"[!] {dst} уже существует и не наш — НЕ затираю. Слей вручную из {src}")
+        ours = MARKER in existing or "bitrix-guard" in existing
+        if not ours:
+            print(f"[!] {dst} уже существует и НЕ наш — НЕ затираю (чтобы не сломать чужой/chain-хук).")
+            print(f"    Наш хук: {src}")
+            print("    Варианты: 1) поставить локально в репозиторий:  python3 scripts/install_git_hooks.py --local")
+            print("              2) если там chain-хук — локальной установки достаточно, он сам вызовет наш")
             return
     shutil.copyfile(src, dst)
     make_executable(dst)

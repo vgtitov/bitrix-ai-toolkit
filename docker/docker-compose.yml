@@ -1,0 +1,25 @@
+# Центральный (общий для команды) сервис проверок Битрикс-кода — ОПЦИОНАЛЬНО.
+# Локальный путь всегда работает без Docker; это ускорение для команды: единая версия линтеров у всех и в CI.
+#
+# Запуск:   docker compose -f docker/docker-compose.yml run --rm checks
+# Проверить конкретный путь: docker compose -f docker/docker-compose.yml run --rm checks check local/
+#
+# Переменные (.env рядом или окружение):
+#   PROJECT_DIR       — путь к проекту Битрикс на хосте (монтируется в /work). По умолчанию — текущий каталог.
+#   BITRIX_AI_CHECKS  — глобальный режим проверок: off | warn | block (по умолчанию warn — не блокирует).
+services:
+  checks:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: bitrix-ai-toolkit/checks:latest
+    volumes:
+      # Код проекта — read-write только если нужен авто-фикс стиля; для чистой проверки достаточно :ro
+      - "${PROJECT_DIR:-../..}:/work"
+      # Свой конфиг опциональности проверок (перекрывает дефолты toolkit)
+      - "${CHECKS_CONFIG:-../config/checks.example.toml}:/toolkit/config/checks.toml:ro"
+    environment:
+      BITRIX_AI_CHECKS: "${BITRIX_AI_CHECKS:-warn}"
+    working_dir: /work
+    # Разовый прогон, не демон
+    restart: "no"

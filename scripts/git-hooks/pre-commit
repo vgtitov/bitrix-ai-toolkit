@@ -1,37 +1,40 @@
 #!/bin/sh
-# bitrix-guard: блокирует коммит staged *.php с обращением к БД в цикле (N+1):
-# GetList/getList/$DB->Query/GetProperty внутри while|for|foreach. ENFORCEMENT к
-# skills/bitrix-performance (references/queries-and-orm.md). Аналог bsl-guard из claude-1c-toolkit.
-# Кроссплатформенно (sh; на Windows — git-bash из состава Git).
-#
-# Ставится через core.hooksPath (scripts/install_git_hooks.py). Хук глобальный, поэтому detector
-# ищется гибко и в ЧУЖИХ репозиториях молча пропускает (exit 0). Явно указать toolkit — env BITRIX_TOOLKIT_DIR.
+# bitrix-guard (ОПЦИОНАЛЬНЫЙ): проверяет staged *.php на обращение к БД в цикле (N+1).
+# По умолчанию режим WARN — показывает находки, но НЕ блокирует коммит (не ухудшает жизнь разработчику).
+# Строгий гейт (block) — осознанно: config/checks.toml [checks.n1_guard].mode="block" или env BITRIX_AI_CHECKS=block.
+# Глобально выключить: BITRIX_AI_CHECKS=off. Аналог bsl-guard из claude-1c-toolkit, но опциональный.
+# Кроссплатформенно (sh; на Windows — git-bash). Явно указать toolkit — env BITRIX_TOOLKIT_DIR.
 
-files=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -iE '\.php$')
+files=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -iE '\.php$' | grep -ivE '/(vendor|bitrix)/')
 [ -z "$files" ] && exit 0
 
-guard=""
-for cand in \
-  "$BITRIX_TOOLKIT_DIR/scripts/bitrix_guard.py" \
-  "$(dirname "$0")/../scripts/bitrix_guard.py" \
-  "$(dirname "$0")/bitrix_guard.py" \
-  "$(git rev-parse --show-toplevel 2>/dev/null)/scripts/bitrix_guard.py"
-do
-  [ -f "$cand" ] && guard="$cand" && break
+tk=""
+for cand in "$BITRIX_TOOLKIT_DIR" "$(dirname "$0")/.." "$(git rev-parse --show-toplevel 2>/dev/null)"; do
+  [ -n "$cand" ] && [ -f "$cand/scripts/bitrix_guard.py" ] && tk="$cand" && break
 done
-[ -z "$guard" ] && exit 0   # detector не найден — не мешаем чужим репозиториям
+[ -z "$tk" ] && exit 0   # detector не найден — не мешаем чужим репозиториям
 
 py=python3
 command -v "$py" >/dev/null 2>&1 || py=python
 command -v "$py" >/dev/null 2>&1 || exit 0
 
+# режим: off | warn | block (дефолт warn)
+mode=$("$py" "$tk/scripts/checks_config.py" n1_guard 2>/dev/null)
+[ -z "$mode" ] && mode=warn
+[ "$mode" = "off" ] && exit 0
+
 # shellcheck disable=SC2086
-echo "$files" | xargs "$py" "$guard"
+out=$(echo "$files" | xargs "$py" "$tk/scripts/bitrix_guard.py" 2>/dev/null)
 rc=$?
-if [ "$rc" -ne 0 ]; then
+[ "$rc" -eq 0 ] && exit 0   # находок нет
+
+echo "$out" >&2
+if [ "$mode" = "block" ]; then
   echo "" >&2
-  echo "[bitrix-guard] коммит остановлен: обращение к БД в цикле (см. выше)." >&2
-  echo "  переделай пакетно (один запрос IN(...)); обойти разово: git commit --no-verify" >&2
+  echo "[bitrix-guard] коммит остановлен (режим block): N+1. Переделай пакетно; обойти разово: git commit --no-verify" >&2
   exit 1
 fi
+echo "" >&2
+echo "[bitrix-guard] предупреждение (режим warn): найден N+1 (см. выше). Коммит НЕ блокирован." >&2
+echo "  строгий гейт: config/checks.toml [checks.n1_guard].mode=\"block\" (или env BITRIX_AI_CHECKS=block)" >&2
 exit 0

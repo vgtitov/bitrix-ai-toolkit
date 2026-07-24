@@ -49,11 +49,24 @@ for d in core/skills/*/; do
   echo "  + $name"
 done
 
-# 4. Сборка конфигов под агентов
+# 4. Конфиги (опциональность проверок + версионный стек) — не перетираем существующие
+say "Конфиги"
+for pair in "checks.example.toml:checks.toml" "version-stack.example.toml:version-stack.toml"; do
+  src="config/${pair%%:*}"; dst="config/${pair##*:}"
+  if [ -f "$dst" ]; then
+    echo "  = $dst уже есть — не трогаю"
+  elif [ -f "$src" ]; then
+    cp "$src" "$dst" && echo "  + $dst (из образца; настрой под себя)"
+  fi
+done
+mkdir -p config/local && echo "  = config/local/ — слой компании (в .gitignore, см. docs/LOCALIZATION.md)"
+echo "  режим проверок сейчас: $(python3 scripts/checks_config.py default 2>/dev/null || echo warn)  (off|warn|block)"
+
+# 5. Сборка конфигов под агентов
 say "Сборка конфигов (build.sh)"
 sh build.sh >/dev/null 2>&1 && echo "  CLAUDE.md/AGENTS.md/.mcp.json/.claude готовы" || echo "  ! build.sh с ошибкой"
 
-# 5. Самотест
+# 6. Самотест
 say "Самотест"
 if have python3; then
   python3 tests/test_bitrix_guard.py && echo "  bitrix_guard: OK" || echo "  ! bitrix_guard FAIL"
@@ -66,11 +79,26 @@ else
   echo "  ast-grep не установлен — правила ast-grep пропущены (guard N+1 работает и без него)"
 fi
 
-say "Готово. Дальше:"
+say "Готово. Дальше (подробно — docs/SETUP.md):"
 cat <<'NEXT'
-  1. В целевом проекте: скопируй core/linters/{phpstan.neon.dist,phpcs.xml.dist,.php-cs-fixer.dist.php,rector.php}
-     в корень, положи ядро своей версии, настрой config/version-stack.toml.
-  2. MCP:  claude mcp add --transport http bitrix-docs https://mcp-dev.bitrix24.com/mcp
-  3. PhpStorm 2025.2+: Settings → Tools → MCP Server (мост для Claude Code).
-  4. Перезапусти Claude Code и подтверди MCP.
+  ОБЯЗАТЕЛЬНО в целевом проекте:
+  1. Линтер-конфиги: скопируй core/linters/{phpstan.neon.dist→phpstan.neon, phpcs.xml.dist,
+     .php-cs-fixer.dist.php, rector.php} в корень проекта.
+  2. config/version-stack.toml — версии PHP/ядра/модулей; путь к РЕАЛЬНОМУ ядру (core_path).
+     Ядро правлено? core_modified = true (см. skills/bitrix-dev/references/custom-core.md).
+  3. Справка: claude mcp add --transport http bitrix-docs https://mcp-dev.bitrix24.com/mcp
+
+  РЕЖИМ ПРОВЕРОК (config/checks.toml или env BITRIX_AI_CHECKS):
+     off   — не проверять (AI пишет по знаниям скилла quality-standards.md)
+     warn  — ДЕФОЛТ: показать проблемы, НЕ блокировать (AI сообщает и предлагает фикс)
+     block — строгий гейт: AI обязан починить до завершения; pre-commit останавливает коммит
+
+  ОПЦИОНАЛЬНО:
+  4. Language Server агенту (навигация+диагностики): docs/language-server.md
+     npm i -g intelephense && claude mcp add php-lsp -- mcp-language-server --workspace "$PWD" --lsp intelephense -- --stdio
+  5. Проверки в Docker (без локальной установки PHP): docker/ — docker compose -f docker/docker-compose.yml run --rm checks
+  6. Интеграции Jira/Confluence (креды в config/local/.env): docs/integrations.md
+  7. Настройки компании отдельным репо: docs/LOCALIZATION.md (config/local/)
+  8. PhpStorm 2025.2+: Settings → Tools → MCP Server (мост IDE для агента).
+  9. Перезапусти агента и подтверди MCP.
 NEXT
