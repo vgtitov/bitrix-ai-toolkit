@@ -16,6 +16,25 @@ sh onboard/install.sh --no-tools   # если инструменты уже ст
 4. **Сборка** (`build.sh`): CLAUDE.md←@AGENTS.md, AGENTS.md, GEMINI.md, .mcp.json, .claude/skills, .claude/settings.json.
 5. **Самотест**: `tests/test_bitrix_guard.py` (должно быть 4/4) + загрузка ast-grep-правил.
 
+## После обновления toolkit
+
+После `git pull`, если менялись hooks, skills, `core/`, MCP или настройки
+адаптеров, обязательно повторно запусти:
+
+```bash
+sh onboard/install.sh --no-tools
+python3 -m pytest tests/test_git_commit_hook.py -q
+git config --get core.hooksPath
+```
+
+Onboarding обновляет принадлежащие toolkit hooks, но не перезаписывает чужие.
+Конфликт hook завершает installer ненулевым кодом; частичную установку нельзя
+считать успешной. При глобальном `operkontur-global-dispatcher` repo-local
+hooks продолжают вызываться через него.
+После изменения MCP/skills/provider-specific settings перезапусти используемый
+агент. Простого обновления файлов репозитория недостаточно для уже установленного
+runtime.
+
 ## Preflight (проверить перед установкой — грабли)
 - **Не перезаписывать** существующий `.env`/`CLAUDE.md` проекта без спроса — onboard пишет toolkit-файлы, не проект.
 - **composer.json проекта** — dev-зависимости ставятся в ПРОЕКТ, не в toolkit. Если CWD не проект — пропустится (норма).

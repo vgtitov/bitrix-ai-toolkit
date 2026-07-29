@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Поставить git-хуки bitrix-ai-toolkit (ПО УМОЛЧАНИЮ — только в текущий репозиторий):
-  - commit-msg — срезает соавторство/атрибуцию Claude/Anthropic из сообщений коммитов;
+  - commit-msg — удаляет строки с названиями/атрибуцией AI-систем;
   - pre-commit — bitrix-guard: блокирует staged *.php с обращением к БД в цикле (N+1). В чужих
     репозиториях (нет detector'а) молча пропускает.
 
@@ -62,10 +62,11 @@ def copy_hook(name: str, dst_dir: Path):
             print(f"    Наш хук: {src}")
             print("    Варианты: 1) поставить локально в репозиторий:  python3 scripts/install_git_hooks.py --local")
             print("              2) если там chain-хук — локальной установки достаточно, он сам вызовет наш")
-            return
+            return False
     shutil.copyfile(src, dst)
     make_executable(dst)
     print(f"[+] {name} → {dst}")
+    return True
 
 
 def main(argv):
@@ -103,9 +104,13 @@ def main(argv):
             print(f"[i] core.hooksPath → {dst}")
         dst.mkdir(parents=True, exist_ok=True)
 
+    all_installed = True
     for h in HOOKS:
-        copy_hook(h, dst)
+        all_installed = copy_hook(h, dst) and all_installed
 
+    if not all_installed:
+        print("[!] hooks установлены частично; устрани конфликт и повтори.", file=sys.stderr)
+        return 2
     print("[ok] git-хуки установлены. Обойти разово: git commit --no-verify")
     return 0
 

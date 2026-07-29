@@ -88,6 +88,11 @@ sh onboard/install.sh            # инструменты + хуки + скил�
 `install.sh` ставит линтеры, git-хуки, копирует скиллы в `~/.claude/skills`, собирает `CLAUDE.md`/`AGENTS.md`/`.mcp.json`.
 Дальше — перезапустить агента, подтвердить MCP. Подробно: `docs/AI_INSTALL_GUIDE.md`, доступы — `docs/ACCESS_SETUP.md`.
 
+После обновления toolkit повторно выполни `sh onboard/install.sh --no-tools`.
+Это применяет изменения hooks, skills и сгенерированных provider-конфигов;
+одного `git pull` недостаточно. Если менялись MCP/skills/settings, перезапусти
+тот агент, которым пользуешься.
+
 ## Демо
 См. `demo/SETUP.md` — развернуть демо за вечер (без полного Битрикса) + сценарий на 5–7 минут.
 

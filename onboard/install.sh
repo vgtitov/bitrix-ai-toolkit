@@ -51,7 +51,7 @@ fi
 
 # 2. Git-хуки (commit-msg чистые сообщения + pre-commit bitrix-guard N+1)
 say "Git-хуки"
-python3 scripts/install_git_hooks.py || echo "  ! хуки не поставились"
+python3 scripts/install_git_hooks.py
 
 # 3. Скиллы → ~/.claude/skills
 say "Скиллы → ~/.claude/skills"
