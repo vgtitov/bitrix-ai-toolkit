@@ -1,13 +1,24 @@
 #!/bin/sh
 # claude-no-coauthor: backward-compatible ownership marker for toolkit installers.
-# Коммиты только от лица владельца: строки с именами/атрибуцией AI-систем
+# Коммиты только от лица владельца: строки-АТРИБУЦИЯ (co-authored-by/generated-with/
+# reviewed-by/assisted-by/written-by, в виде git-трейлера ИЛИ обычного предложения)
 # удаляются из сообщения до создания коммита.
 # Ставится через scripts/install_git_hooks.py (core.hooksPath). Этот файл — эталон для ручного слияния,
 # если на машине уже есть свой commit-msg хук.
+#
+# Version: structural-v2. НЕ полагается на список имён AI-инструментов — новые модели появляются
+# постоянно, денлист по именам всегда неполный, а бэйр-упоминание инструмента как ТЕМЫ коммита
+# ("Скилл интеграции с M365 Copilot") резалось наравне с реальной атрибуцией. Вместо этого ловим по
+# ФОРМЕ атрибуции — git-трейлер вида "Token: значение" с attribution-токеном, либо фраза
+# "co-authored by / generated with|by / reviewed by / assisted by / written by" где угодно в строке.
+# Денлист доменов ниже — только дополнительная подстраховка для голых адресов без attribution-глагола.
 f="$1"
 [ -f "$f" ] || exit 0
 
-pattern='co[[:space:]-]*authored[[:space:]-]*by|reviewed[[:space:]-]*by|assisted[[:space:]-]*by|generated[[:space:]-]*(with|by)|claude|anthropic|codex|chatgpt|openai|gemini|copilot|grok|deepseek|qwen|mistral|perplexity|meta[[:space:]-]*ai|llama|cohere|cursor|windsurf|cline|aider|tabnine|devin|replit[[:space:]-]*agent|phind|kimi|gigachat|yandexgpt|(^|[^[:alnum:]_])(ai|ии)([^[:alnum:]_]|$)|ai[[:space:]-]*(generated|assisted)'
+trailer_pattern='^[[:space:]]*[a-z0-9][a-z0-9_-]*(-by|-session|-generated|-assisted)[[:space:]]*:'
+verb_pattern='co[[:space:]-]*authored[[:space:]-]*by|reviewed[[:space:]-]*by|assisted[[:space:]-]*by|generated[[:space:]-]*(with|by)|written[[:space:]-]*by'
+domain_pattern='anthropic\.com|claude\.ai|openai\.com|noreply@(anthropic|openai|github)\.com'
+pattern="${trailer_pattern}|${verb_pattern}|${domain_pattern}"
 if [ -n "${OPERKONTUR_AI_NAME_PATTERN:-}" ]; then
   pattern="${pattern}|${OPERKONTUR_AI_NAME_PATTERN}"
 fi
