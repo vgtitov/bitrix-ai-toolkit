@@ -46,7 +46,8 @@ bitrix-ai-toolkit/
 ├── onboard/install.sh        # идемпотентная автоустановка: инструменты + хуки + скиллы + сборка + самотест
 ├── tests/                    # функциональные тесты (test_bitrix_guard.py + фикстуры)
 ├── demo/                     # SETUP.md (развернуть демо за вечер)
-└── docs/                     # version-compatibility · AI_INSTALL_GUIDE · ACCESS_SETUP · ПЛАН_РЕАЛИЗАЦИИ
+└── docs/                     # version-compatibility · AI_INSTALL_GUIDE · ACCESS_SETUP ·
+                              # CONTEXT_AND_KNOWLEDGE (где хранить контекст) · ПЛАН_РЕАЛИЗАЦИИ
 ```
 Сгенерированные из `core/` файлы (`CLAUDE.md`, `AGENTS.md`, `.mcp.json`, `.claude/`) закоммичены, чтобы репо работал
 сразу после клонирования. Правь `core/` → пересобирай `sh build.sh` (не редактируй сгенерированное вручную).
