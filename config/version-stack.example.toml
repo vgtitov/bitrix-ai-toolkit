@@ -10,7 +10,8 @@ version = "8.3"
 # Rector/PHPStan таргетируются на эту версию: не предлагать синтаксис новее, чем доступно.
 
 [bitrix]
-edition = "business"          # start | standard | small_business | business | enterprise
+edition = "business"          # БУС: start | standard | small_business | business | enterprise
+                              # Битрикс24 в коробке (портал как витрина) — впиши "portal" и уточни ниже
 main_version = "24.x"         # версия главного модуля (см. Обновление системы → текущая версия)
 # Ключевой механизм проверки версий: путь к РЕАЛЬНОМУ ядру ТВОЕЙ версии для scanDirectories PHPStan.
 # PHPStan сам ругается «метода нет в этой версии», а phpstan-deprecation-rules — на устаревшее (@deprecated в ядре).
@@ -18,6 +19,10 @@ core_path = "bitrix/modules"
 # Ядро правлено (не эталонный дистрибутив)? Тогда анализ и сигнатуры — по ФАКТИЧЕСКОМУ коду, а не по докам вендора.
 # Агент помечает такие места [правлено ядро]. Подробно — skills/bitrix-dev/references/custom-core.md
 core_modified = false
+
+# Заполни, только если edition = "portal" — проект стоит на Битрикс24 в коробке, а не на БУС:
+# generic-правила toolkit калиброваны под БУС и здесь применимы не дословно, сверяй по факту.
+# portal_note = "какие портальные модули реально используются (напр. crm — не просто установлены)"
 core_patches = "patches/core" # где лежат .patch и REGISTRY.md правок ядра (если core_modified = true)
 
 [modules]
