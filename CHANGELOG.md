@@ -2,6 +2,17 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/). Версии — [SemVer](https://semver.org/lang/ru/).
 
+## [0.2.3] — 2026-09-15
+
+### Fixed
+- CI ломался на `actions/checkout@v4` каждым коммитом минимум с 24.07: `unable to create symlink
+  GEMINI.md: File name too long`. Причина — GEMINI.md трекался в git с mode 120000 (symlink), а
+  `build.sh` на Windows без NTFS-привилегии на симлинки плюхал туда полный текст `core/AGENTS.md`
+  вместо короткого таргета; git оставлял старый mode. Linux-раннер пытался вызвать `symlink()` с
+  16 КБ строкой вместо пути → ENAMETOOLONG. Тот же баг уже был найден и починен в `claude-1c-toolkit`
+  (`6b7e7b4`) — применён тот же фикс: `build.sh` больше не пытается делать символьную ссылку для
+  GEMINI.md, сразу копия (как у AGENTS.md/CLAUDE.md); mode блоба исправлен `git rm --cached` + `add`.
+
 ## [0.2.2] — 2026-09-15
 
 ### Fixed
