@@ -2,6 +2,16 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/). Версии — [SemVer](https://semver.org/lang/ru/).
 
+## [0.2.5] — 2026-09-23
+
+### Added
+- `bitrix-analyst`: методика Паспорта проекта и ТЗ для заказчика (`references/passport-template.md`), анализ кода
+  без правки для роли аналитика (`references/code-audit-for-analyst.md`), модель данных и REST-интеграции Bitrix24
+  CRM, перенос BI-отчётов между порталами, чек-лист производительности SQL-датасетов на Trino
+  (`references/bitrix24-integration.md`). Вклад Игоря Реутского (PR #1), доработан по ревью: коробка и облако
+  Bitrix24 разведены, безопасный приём вебхуков (HMAC + nonce), классификация ответов форм, штатная диагностика
+  BI Конструктора, граница ЧТЗ и архитектурного приложения.
+
 ## [0.2.4] — 2026-09-23
 
 ### Added
