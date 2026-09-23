@@ -2,6 +2,15 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/). Версии — [SemVer](https://semver.org/lang/ru/).
 
+## [0.2.4] — 2026-09-23
+
+### Added
+- `scripts/repo_freshness.py` + хук `SessionStart` (`adapters/claude/settings.json`): раз в сутки `git fetch`;
+  если клон отстал от upstream, агент в начале сессии предлагает человеку обновиться. Pull сам не делает,
+  на пин-теге молчит, без сети не тормозит. Тот же механизм, что в `bsl-ai-toolkit` v2.3.7.
+- `docs/LOCALIZATION.md`: конфиг хука для командного репозитория и сценарий первичного сбора контекста
+  команды (`CONTEXT_INTAKE`, промпт на роль, один раскладывающий).
+
 ## [0.2.3] — 2026-09-15
 
 ### Fixed

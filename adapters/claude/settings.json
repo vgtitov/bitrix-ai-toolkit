@@ -14,6 +14,18 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 30,
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-.}\" && { python3 scripts/repo_freshness.py 2>/dev/null || python scripts/repo_freshness.py 2>/dev/null; } || true"
+          }
+        ]
+      }
     ]
-  }
+  },
+  "//4": "SessionStart: scripts/repo_freshness.py — раз в сутки git fetch; если клон отстал от upstream, одна строка в контекст агента «предложи обновиться». Pull сам не делает, на пин-теге молчит."
 }
