@@ -2,6 +2,12 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/). Версии — [SemVer](https://semver.org/lang/ru/).
 
+## [Unreleased]
+
+### Changed
+- `LICENSE` содержит только текст MIT; оговорка о товарных знаках перенесена в `NOTICE.md`, чтобы GitHub и каталоги
+  распознавали лицензию.
+
 ## [0.2.5] — 2026-09-23
 
 ### Added
