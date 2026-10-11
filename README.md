@@ -1,15 +1,28 @@
 # bitrix-ai-toolkit — AI-first разработка 1С-Битрикс (мульти-агентный контур)
 
+[![CI](https://github.com/vgtitov/bitrix-ai-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/vgtitov/bitrix-ai-toolkit/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-00B9BF.svg)](LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![AGENTS.md](https://img.shields.io/badge/AGENTS.md-ready-blue.svg)](AGENTS.md)
 [![PHP 8.2+](https://img.shields.io/badge/PHP-8.2%2B-777BB4.svg)](https://www.php.net/)
-[![Bitrix](https://img.shields.io/badge/1С--Битрикс-BUS-orange.svg)](https://dev.1c-bitrix.ru/)
+
+*AI agent toolkit for 1C-Bitrix (PHP) development. MIT. Documentation is in Russian.*
 
 Переиспользуемый набор **правил + скиллов + зашитых проверок + MCP-обвязки + документации окружения** для
 AI-ассистированной разработки на **1С-Битрикс: Управление сайтом** (PHP). **Не привязан к конкретному AI**: ядро
 общее, агент подключается адаптером (из коробки — Claude Code, Codex, Gemini CLI; остальные — см. `adapters/README.md`). Не привязан к конкретной организации — адаптируется под любой проект/редакцию. Принцип: **AI не
 угадывает Битрикс, а работает по РЕАЛЬНОМУ коду ядра и справке, по стандартам, доводит код до production-ready.**
+
+## Быстрый старт
+```bash
+git clone https://github.com/vgtitov/bitrix-ai-toolkit && cd bitrix-ai-toolkit
+sh onboard/install.sh            # инструменты + хуки + скиллы + сборка конфигов + самотест
+```
+`install.sh` ставит линтеры, git-хуки, копирует скиллы в `~/.claude/skills`, собирает `CLAUDE.md`/`AGENTS.md`/`.mcp.json`.
+Дальше — перезапустить агента, подтвердить MCP. Подробно: `docs/AI_INSTALL_GUIDE.md`, доступы — `docs/ACCESS_SETUP.md`.
+
+После обновления toolkit повторно выполни `sh onboard/install.sh --no-tools`.
+Это применяет изменения hooks, skills и сгенерированных provider-конфигов;
+одного `git pull` недостаточно. Если менялись MCP/skills/settings, перезапусти
+тот агент, которым пользуешься.
 
 > **Claude Code — первая (эталонная) реализация.** Остальные агенты подключаются минимальной адаптацией из общего
 > ядра (`core/`) — см. `adapters/`. Три оси переносимости: **AGENTS.md** (правила) + **SKILL.md** (навыки) + **MCP**
@@ -80,19 +93,6 @@ bitrix-ai-toolkit/
 рефакторинг — `rectorphp/rector`; тесты — `phpunit`/`pest`; навигация — Grep/ripgrep + `oraios/serena` + `ast-grep`;
 ядро в vendor — `bitrix-toolkit/bitrix-ci`; стабы — `matiaspub/bxApiDocs`; миграции — `andreyryabin/sprint.migration`;
 референс-конфиг PHPStan — `spaceonfire/bitrix-tools`. Версии проверяй на месте.
-
-## Установка
-```bash
-git clone https://github.com/vgtitov/bitrix-ai-toolkit && cd bitrix-ai-toolkit
-sh onboard/install.sh            # инструменты + хуки + скиллы + сборка конфигов + самотест
-```
-`install.sh` ставит линтеры, git-хуки, копирует скиллы в `~/.claude/skills`, собирает `CLAUDE.md`/`AGENTS.md`/`.mcp.json`.
-Дальше — перезапустить агента, подтвердить MCP. Подробно: `docs/AI_INSTALL_GUIDE.md`, доступы — `docs/ACCESS_SETUP.md`.
-
-После обновления toolkit повторно выполни `sh onboard/install.sh --no-tools`.
-Это применяет изменения hooks, skills и сгенерированных provider-конфигов;
-одного `git pull` недостаточно. Если менялись MCP/skills/settings, перезапусти
-тот агент, которым пользуешься.
 
 ## Демо
 См. `demo/SETUP.md` — развернуть демо за вечер (без полного Битрикса) + сценарий на 5–7 минут.
