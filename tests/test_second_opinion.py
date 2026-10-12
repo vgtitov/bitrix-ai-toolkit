@@ -31,12 +31,17 @@ def test_chain_order():
 
 def test_pii_redacted_for_every_link():
     seen = []
-    cap = lambda *a, **k: seen.append(k.get("stdin") or a[0]) or "ответ"  # noqa: E731
+    cap = lambda p: seen.append(p) or "ответ"  # noqa: E731
+    codex_called = []
+    codex = lambda *a, **k: codex_called.append(1) or "codex"  # noqa: E731
     for text in ("пиши ivan@example.com", "звони +375 29 123-45-67", "+1 (415) 555-2671", "+44 20 7946 0958",
-                 "пиши иван@почта.рф", "8 029 123 45 67", "(415) 555-2671", "029 123-45-67"):
+                 "пиши иван@почта.рф", "8 029 123 45 67", "(415) 555-2671", "029 123-45-67",
+                 "8(029)123-45-67", "80291234567", "+375291234567"):
         seen.clear()
-        assert so.ask(text, chain=(), codex=cap)[0] == "codex"
+        assert so.ask(text, chain=(("t", cap),), codex=codex)[0] == "t", text
         assert "<скрыто>" in seen[0] and not any(c.isdigit() for c in seen[0].split("<скрыто>")[-1]), text
+    assert not codex_called                                 # при ПД Codex с доступом к файлам не зовём
+    assert so.ask("без данных", chain=(), codex=codex)[0] == "codex"
     for text in ("версия 8.3.27.1606, задача DEV1C-2476", "дата 2026-10-12", "строки 120-135"):
         assert so.redact(text)[1] == 0, text
 

@@ -14,8 +14,8 @@ Claude не проверяет сам себя: ревью и проверку �
 
 Звено пропускается, если его нет, оно в лимите, недоступно из страны (геоблок OpenAI в РФ, РБ и
 других регионах — нужен VPN) или вернуло пустой ответ. Не ответил никто — код 2, и «готово» нельзя.
-E-mail и телефоны в тексте заменяются на <скрыто> до отправки любому звену. Если они были в диффе, Codex
-получает только очищенный дифф без доступа к репозиторию.
+E-mail и телефоны в тексте заменяются на <скрыто> до отправки любому звену. Если они нашлись, Codex
+(у него есть доступ к файлам) пропускается: проверяют только текстовые звенья по очищенному тексту.
 
   python scripts/second_opinion.py review --base origin/main [--repo .]
   python scripts/second_opinion.py review --commit HEAD
@@ -46,7 +46,9 @@ DOWN_RX = re.compile(r"(?m)^(ERROR:.*(usage limit|rate.?limit|429|quota|unauthor
 # e-mail (и с не-ASCII доменом) и телефоны в международном и местном формате; лучше лишний отказ, чем утечка
 PII_RX = re.compile(r"[^\s@<>\"']+@[^\s@<>\"']+\.[^\s@<>\"'.]{2,}"           # e-mail
                     r"|(?<![\w+])\+\d[\d\s().-]{7,}\d"                           # +код страны
-                    r"|(?<![\w.])\(?\d{2,4}\)?[\s-]\d{2,3}[\s-]?\d{2}[\s-]?\d{2}(?![\w.])", re.I)  # местный
+                    r"|(?<![\w.])\(?\d{2,4}\)?[\s-]\d{2,3}[\s-]?\d{2}[\s-]?\d{2}(?![\w.])"   # местный
+                    r"|(?<![\w.])[80]\s?\(?\d{2,4}\)?[\s-]?\d{2,3}[\s-]?\d{2}[\s-]?\d{2}(?![\w.])",  # слитный, 8(0xx)
+                    re.I)
 REVIEW_PROMPT = ("Ты ревьюер кода. Часть {part} диффа репозитория {repo}. Найди дефекты: ошибки логики, "
                  "безопасность, потерю данных, регрессии, несоответствие описанию. Для каждого: [P0–P3] файл:строка "
                  "— что не так и как исправить. Стиль не обсуждай. Нет дефектов — так и напиши.\n\n{chunk}")
@@ -89,7 +91,10 @@ def copilot(prompt: str) -> str | None:
         if os.name == "nt":
             subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
         else:
-            os.killpg(proc.pid, 9)
+            try:
+                os.killpg(proc.pid, 9)
+            except (ProcessLookupError, PermissionError):
+                pass                                   # успел завершиться сам
         proc.communicate()
         print("⚠ Copilot: таймаут", flush=True)
         return None
@@ -157,15 +162,13 @@ def review(repo: Path, base: str | None, commit: str | None, chain=TEXT_CHAIN, c
         return "none", "Дифф пуст — проверять нечего."
     diff, hidden = redact(diff)
     if hidden:
-        # в диффе ПД: Codex получает только очищенный дифф из пустого каталога, без доступа к репозиторию
-        print(f"⚠ в диффе скрыто {hidden} e-mail/телефонов; Codex проверяет очищенный дифф без доступа к репо", flush=True)
-        with tempfile.TemporaryDirectory() as tmp:
-            out = codex(["exec", "--skip-git-repo-check", "-s", "read-only", "-"], Path(tmp),
-                        stdin=REVIEW_PROMPT.format(part="1 из 1", repo=repo.name, chunk=diff))
+        # в диффе ПД: Codex с инструментами может прочитать исходные файлы, поэтому его не зовём;
+        # проверяют только текстовые звенья по очищенному диффу
+        print(f"⚠ в диффе скрыто {hidden} e-mail/телефонов; Codex пропущен, проверка по очищенному тексту", flush=True)
     else:
         out = codex(["exec", "review"] + (["--commit", commit] if commit else ["--base", base]), repo)
-    if out:
-        return "codex", out
+        if out:
+            return "codex", out
     chunks = split_diff(diff)
     for who, fn in chain:
         parts = []
@@ -182,11 +185,12 @@ def review(repo: Path, base: str | None, commit: str | None, chain=TEXT_CHAIN, c
 def ask(prompt: str, chain=TEXT_CHAIN, codex=codex_exec) -> tuple:
     prompt, hidden = redact(prompt)
     if hidden:
-        print(f"⚠ скрыто {hidden} e-mail/телефонов", flush=True)
-    with tempfile.TemporaryDirectory() as tmp:          # пустой каталог: Codex не читает чужие файлы
-        out = codex(["exec", "--skip-git-repo-check", "-s", "read-only", "-"], Path(tmp), stdin=prompt)
-    if out:
-        return "codex", out
+        print(f"⚠ скрыто {hidden} e-mail/телефонов; Codex пропущен, проверка по очищенному тексту", flush=True)
+    else:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = codex(["exec", "--skip-git-repo-check", "-s", "read-only", "-"], Path(tmp), stdin=prompt)
+        if out:
+            return "codex", out
     for who, fn in chain:
         ans = fn(prompt)
         if ans:
