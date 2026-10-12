@@ -9,11 +9,12 @@ Claude не проверяет сам себя: ревью и проверку �
      корпоративный ассистент   со STDIN и печатает ответ (адаптер к M365 Copilot или другому сервису).
   3. Модель без обучения     — только если есть OPENROUTER_API_KEY И явно разрешено AI_TOOLKIT_NOTRAIN=1;
                                запрос уходит лишь провайдерам, которые не хранят и не обучаются
-                               (provider.data_collection = deny), и только без e-mail и телефонов в тексте.
+                               (provider.data_collection = deny, zdr = true).
                                Бесплатные модели не вызываются никогда: они обучаются на запросах.
 
 Звено пропускается, если его нет, оно в лимите, недоступно из страны (геоблок OpenAI в РФ, РБ и
 других регионах — нужен VPN) или вернуло пустой ответ. Не ответил никто — код 2, и «готово» нельзя.
+E-mail и телефоны в тексте не уходят ни одному звену: отказ, пока человек не подтвердит --allow-pii.
 
   python scripts/second_opinion.py review --base origin/main [--repo .]
   python scripts/second_opinion.py review --commit HEAD
@@ -28,7 +29,6 @@ import argparse
 import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -41,8 +41,10 @@ CHUNK = 24000
 TIMEOUT = 1800
 DOWN_RX = re.compile(r"(?m)^(ERROR:.*(usage limit|rate.?limit|429|quota|unauthori[sz]ed|not logged in|"
                      r"unsupported.?country|forbidden|403))", re.I)
-PII_RX = re.compile(r"[\w.+-]+@[\w-]+\.[a-z]{2,}|(?<!\d)(?:\+7|\+375|\+998|\+996|\+994|\+971|8)[\s(-]*\d{2,3}"
-                    r"[\s)-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}(?!\d)", re.I)
+# e-mail (и с не-ASCII доменом) и телефоны в международном и местном формате; лучше лишний отказ, чем утечка
+PII_RX = re.compile(r"[^\s@<>\"']+@[^\s@<>\"']+\.[^\s@<>\"'.]{2,}"
+                    r"|(?<![\w+])\+\d[\d\s().-]{7,}\d"
+                    r"|(?<!\d)8[\s(-]*0?\d{2,3}[\s)-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}(?!\d)", re.I)
 REVIEW_PROMPT = ("Ты ревьюер кода. Часть {part} диффа репозитория {repo}. Найди дефекты: ошибки логики, "
                  "безопасность, потерю данных, регрессии, несоответствие описанию. Для каждого: [P0–P3] файл:строка "
                  "— что не так и как исправить. Стиль не обсуждай. Нет дефектов — так и напиши.\n\n{chunk}")
@@ -61,10 +63,10 @@ def codex_exec(args: list, cwd: Path, stdin: str | None = None) -> str | None:
         print(f"⚠ Codex: {e}", flush=True)
         return None
     out = (r.stdout or "") + (r.stderr or "")
-    if r.returncode != 0 or not out.strip() or DOWN_RX.search(out[-800:]):
+    if r.returncode != 0 or not (r.stdout or "").strip() or DOWN_RX.search(out[-800:]):
         print(f"⚠ Codex не ответил: {(out.strip().splitlines() or [str(r.returncode)])[-1][:160]}", flush=True)
         return None
-    return out
+    return r.stdout                      # только ответ: в stderr ход работы и исходный запрос
 
 
 def copilot(prompt: str) -> str | None:
@@ -72,9 +74,9 @@ def copilot(prompt: str) -> str | None:
     if not cmd:
         return None
     try:
-        r = subprocess.run(shlex.split(cmd, posix=os.name != "nt"), input=prompt, capture_output=True,
-                           text=True, timeout=900)
-    except (OSError, subprocess.TimeoutExpired, ValueError) as e:
+        # команду задаёт сам человек в своём окружении; оболочка разбирает кавычки и на Windows
+        r = subprocess.run(cmd, shell=True, input=prompt, capture_output=True, text=True, timeout=900)
+    except (OSError, subprocess.TimeoutExpired) as e:
         print(f"⚠ Copilot: {e}", flush=True)
         return None
     return r.stdout if r.returncode == 0 and r.stdout.strip() else None
@@ -84,11 +86,11 @@ def notrain(prompt: str) -> str | None:
     key = os.environ.get("OPENROUTER_API_KEY", "")
     if not key or os.environ.get("AI_TOOLKIT_NOTRAIN") != "1":
         return None
-    if PII_RX.search(prompt):
-        print("⚠ модель без обучения пропущена: в тексте e-mail или телефон", flush=True)
+    if NOTRAIN_MODEL.endswith(":free"):
+        print("⚠ бесплатная модель запрещена: она обучается на запросах", flush=True)
         return None
     body = json.dumps({"model": NOTRAIN_MODEL, "messages": [{"role": "user", "content": prompt}],
-                       "provider": {"data_collection": "deny"}}).encode("utf-8")
+                       "provider": {"data_collection": "deny", "zdr": True}}).encode("utf-8")
     req = urllib.request.Request("https://openrouter.ai/api/v1/chat/completions", data=body,
                                  headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
     try:
@@ -117,15 +119,36 @@ def split_diff(diff: str, limit: int = CHUNK) -> list:
     return out + ([cur] if cur else [])
 
 
-def review(repo: Path, base: str | None, commit: str | None, chain=TEXT_CHAIN, codex=codex_exec) -> tuple:
+def _git(repo: Path, *args) -> str:
+    return subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=True).stdout
+
+
+def collect_diff(repo: Path, base: str | None, commit: str | None) -> str:
+    if commit:
+        parents = _git(repo, "rev-list", "--parents", "-n", "1", commit).split()[1:]
+        return _git(repo, "diff", "--no-color", "-U5", f"{commit}^1", commit) if parents else \
+            _git(repo, "show", "--format=", "--no-color", "-U5", commit)   # merge — к первому родителю, корень целиком
+    mb = _git(repo, "merge-base", base, "HEAD").strip()
+    return _git(repo, "diff", "--no-color", "-U5", mb)        # с рабочим деревом: и незакоммиченные правки
+
+
+def pii_block(text: str, allow: bool) -> str:
+    """Причина отказа или пусто. ПД не уходят ни одному звену, пока человек явно не разрешил (--allow-pii)."""
+    return "" if allow or not PII_RX.search(text) else \
+        "в тексте e-mail или телефон: проверь, что это не персональные данные, и повтори с --allow-pii"
+
+
+def review(repo: Path, base: str | None, commit: str | None, chain=TEXT_CHAIN, codex=codex_exec,
+           allow_pii: bool = False) -> tuple:
+    diff = collect_diff(repo, base, commit)
+    if not diff.strip():
+        return "none", "Дифф пуст — проверять нечего."
+    block = pii_block(diff, allow_pii)
+    if block:
+        return "", block
     out = codex(["exec", "review"] + (["--commit", commit] if commit else ["--base", base]), repo)
     if out:
         return "codex", out
-    cmd = ["git", "show", "--format=", "--no-color", "-U5", commit] if commit else \
-        ["git", "diff", "--no-color", "-U5", f"{base}...HEAD"]
-    diff = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, check=True).stdout
-    if not diff.strip():
-        return "none", "Дифф пуст — проверять нечего."
     chunks = split_diff(diff)
     for who, fn in chain:
         parts = []
@@ -139,7 +162,10 @@ def review(repo: Path, base: str | None, commit: str | None, chain=TEXT_CHAIN, c
     return "", ""
 
 
-def ask(prompt: str, chain=TEXT_CHAIN, codex=codex_exec) -> tuple:
+def ask(prompt: str, chain=TEXT_CHAIN, codex=codex_exec, allow_pii: bool = False) -> tuple:
+    block = pii_block(prompt, allow_pii)
+    if block:
+        return "", block
     out = codex(["exec", "--skip-git-repo-check", "-s", "read-only", "-"], Path.cwd(), stdin=prompt)
     if out:
         return "codex", out
@@ -176,16 +202,18 @@ def main(argv=None) -> int:
     g.add_argument("--commit")
     ak = sub.add_parser("ask")
     ak.add_argument("text")
+    for sp in (rv, ak):
+        sp.add_argument("--allow-pii", action="store_true", help="в тексте нет персональных данных, проверено человеком")
     sub.add_parser("status")
     a = ap.parse_args(argv)
     if a.cmd == "status":
         return status()
     if a.cmd == "review":
-        who, body = review(a.repo.resolve(), a.base, a.commit)
+        who, body = review(a.repo.resolve(), a.base, a.commit, allow_pii=a.allow_pii)
     else:
-        who, body = ask(sys.stdin.read() if a.text == "-" else a.text)
+        who, body = ask(sys.stdin.read() if a.text == "-" else a.text, allow_pii=a.allow_pii)
     if not who:
-        print("Второе мнение недоступно: ни одно звено цепочки не ответило. Проверь `status`; готовым не считать.")
+        print(f"Второе мнение недоступно: {body or 'ни одно звено цепочки не ответило, проверь `status`'}. Готовым не считать.")
         return 2
     print(body)
     print(f"\nПроверял: {who}. Отчёт: {_report(a.cmd, who, body)}")
