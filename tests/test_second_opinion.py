@@ -29,14 +29,16 @@ def test_chain_order():
     assert so.ask("q", chain=(), codex=lambda *a, **k: "codex ok") == ("codex", "codex ok")
 
 
-def test_pii_blocks_every_link():
-    hit = lambda *a, **k: "ответ"  # noqa: E731
+def test_pii_redacted_for_every_link():
+    seen = []
+    cap = lambda *a, **k: seen.append(k.get("stdin") or a[0]) or "ответ"  # noqa: E731
     for text in ("пиши ivan@example.com", "звони +375 29 123-45-67", "+1 (415) 555-2671", "+44 20 7946 0958",
-                 "пиши иван@почта.рф", "8 029 123 45 67"):
-        who, why = so.ask(text, chain=(("a", hit),), codex=hit)
-        assert who == "" and "--allow-pii" in why, text
-    assert so.ask("+44 20 7946 0958", chain=(), codex=hit, allow_pii=True)[0] == "codex"
-    assert so.ask("версия 8.3.27.1606, задача DEV1C-2476", chain=(), codex=hit)[0] == "codex"
+                 "пиши иван@почта.рф", "8 029 123 45 67", "(415) 555-2671", "029 123-45-67"):
+        seen.clear()
+        assert so.ask(text, chain=(), codex=cap)[0] == "codex"
+        assert "<скрыто>" in seen[0] and not any(c.isdigit() for c in seen[0].split("<скрыто>")[-1]), text
+    for text in ("версия 8.3.27.1606, задача DEV1C-2476", "дата 2026-10-12", "строки 120-135"):
+        assert so.redact(text)[1] == 0, text
 
 
 def test_split_diff():
@@ -58,6 +60,9 @@ def test_notrain_gates():
         import importlib
         importlib.reload(so)
         assert so.notrain("q") is None                     # бесплатная модель запрещена
+        os.environ["AI_TOOLKIT_NOTRAIN_MODEL"] = "openrouter/free"
+        importlib.reload(so)
+        assert so.notrain("q") is None
         os.environ.pop("AI_TOOLKIT_NOTRAIN_MODEL")
         importlib.reload(so)
         os.environ.pop("AI_TOOLKIT_COPILOT_CMD", None)
@@ -97,7 +102,7 @@ def test_codex_setup_respects_opt_out():
 
 if __name__ == "__main__":
     test_chain_order()
-    test_pii_blocks_every_link()
+    test_pii_redacted_for_every_link()
     test_split_diff()
     test_notrain_gates()
     test_collect_diff_sees_worktree_and_merge()

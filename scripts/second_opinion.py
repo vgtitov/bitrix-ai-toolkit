@@ -14,7 +14,8 @@ Claude не проверяет сам себя: ревью и проверку �
 
 Звено пропускается, если его нет, оно в лимите, недоступно из страны (геоблок OpenAI в РФ, РБ и
 других регионах — нужен VPN) или вернуло пустой ответ. Не ответил никто — код 2, и «готово» нельзя.
-E-mail и телефоны в тексте не уходят ни одному звену: отказ, пока человек не подтвердит --allow-pii.
+E-mail и телефоны в тексте заменяются на <скрыто> до отправки любому звену. Если они были в диффе, Codex
+получает только очищенный дифф без доступа к репозиторию.
 
   python scripts/second_opinion.py review --base origin/main [--repo .]
   python scripts/second_opinion.py review --commit HEAD
@@ -32,6 +33,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.request
 from datetime import datetime
 from pathlib import Path
@@ -42,9 +44,9 @@ TIMEOUT = 1800
 DOWN_RX = re.compile(r"(?m)^(ERROR:.*(usage limit|rate.?limit|429|quota|unauthori[sz]ed|not logged in|"
                      r"unsupported.?country|forbidden|403))", re.I)
 # e-mail (и с не-ASCII доменом) и телефоны в международном и местном формате; лучше лишний отказ, чем утечка
-PII_RX = re.compile(r"[^\s@<>\"']+@[^\s@<>\"']+\.[^\s@<>\"'.]{2,}"
-                    r"|(?<![\w+])\+\d[\d\s().-]{7,}\d"
-                    r"|(?<!\d)8[\s(-]*0?\d{2,3}[\s)-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}(?!\d)", re.I)
+PII_RX = re.compile(r"[^\s@<>\"']+@[^\s@<>\"']+\.[^\s@<>\"'.]{2,}"           # e-mail
+                    r"|(?<![\w+])\+\d[\d\s().-]{7,}\d"                           # +код страны
+                    r"|(?<![\w.])\(?\d{2,4}\)?[\s-]\d{2,3}[\s-]?\d{2}[\s-]?\d{2}(?![\w.])", re.I)  # местный
 REVIEW_PROMPT = ("Ты ревьюер кода. Часть {part} диффа репозитория {repo}. Найди дефекты: ошибки логики, "
                  "безопасность, потерю данных, регрессии, несоответствие описанию. Для каждого: [P0–P3] файл:строка "
                  "— что не так и как исправить. Стиль не обсуждай. Нет дефектов — так и напиши.\n\n{chunk}")
@@ -74,19 +76,31 @@ def copilot(prompt: str) -> str | None:
     if not cmd:
         return None
     try:
-        # команду задаёт сам человек в своём окружении; оболочка разбирает кавычки и на Windows
-        r = subprocess.run(cmd, shell=True, input=prompt, capture_output=True, text=True, timeout=900)
-    except (OSError, subprocess.TimeoutExpired) as e:
+        # команду задаёт сам человек; оболочка разбирает кавычки и на Windows. По таймауту гасим всю группу
+        grp = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
+        proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True, **grp)
+    except OSError as e:
         print(f"⚠ Copilot: {e}", flush=True)
         return None
-    return r.stdout if r.returncode == 0 and r.stdout.strip() else None
+    try:
+        out, _ = proc.communicate(prompt, timeout=900)
+    except subprocess.TimeoutExpired:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
+        else:
+            os.killpg(proc.pid, 9)
+        proc.communicate()
+        print("⚠ Copilot: таймаут", flush=True)
+        return None
+    return out if proc.returncode == 0 and out.strip() else None
 
 
 def notrain(prompt: str) -> str | None:
     key = os.environ.get("OPENROUTER_API_KEY", "")
     if not key or os.environ.get("AI_TOOLKIT_NOTRAIN") != "1":
         return None
-    if NOTRAIN_MODEL.endswith(":free"):
+    if NOTRAIN_MODEL.endswith(":free") or NOTRAIN_MODEL.startswith("openrouter/free"):
         print("⚠ бесплатная модель запрещена: она обучается на запросах", flush=True)
         return None
     body = json.dumps({"model": NOTRAIN_MODEL, "messages": [{"role": "user", "content": prompt}],
@@ -132,21 +146,24 @@ def collect_diff(repo: Path, base: str | None, commit: str | None) -> str:
     return _git(repo, "diff", "--no-color", "-U5", mb)        # с рабочим деревом: и незакоммиченные правки
 
 
-def pii_block(text: str, allow: bool) -> str:
-    """Причина отказа или пусто. ПД не уходят ни одному звену, пока человек явно не разрешил (--allow-pii)."""
-    return "" if allow or not PII_RX.search(text) else \
-        "в тексте e-mail или телефон: проверь, что это не персональные данные, и повтори с --allow-pii"
+def redact(text: str) -> tuple:
+    """Заменить e-mail и телефоны на <скрыто> до отправки любому звену → (текст, сколько скрыто)."""
+    return PII_RX.subn("<скрыто>", text)
 
 
-def review(repo: Path, base: str | None, commit: str | None, chain=TEXT_CHAIN, codex=codex_exec,
-           allow_pii: bool = False) -> tuple:
+def review(repo: Path, base: str | None, commit: str | None, chain=TEXT_CHAIN, codex=codex_exec) -> tuple:
     diff = collect_diff(repo, base, commit)
     if not diff.strip():
         return "none", "Дифф пуст — проверять нечего."
-    block = pii_block(diff, allow_pii)
-    if block:
-        return "", block
-    out = codex(["exec", "review"] + (["--commit", commit] if commit else ["--base", base]), repo)
+    diff, hidden = redact(diff)
+    if hidden:
+        # в диффе ПД: Codex получает только очищенный дифф из пустого каталога, без доступа к репозиторию
+        print(f"⚠ в диффе скрыто {hidden} e-mail/телефонов; Codex проверяет очищенный дифф без доступа к репо", flush=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            out = codex(["exec", "--skip-git-repo-check", "-s", "read-only", "-"], Path(tmp),
+                        stdin=REVIEW_PROMPT.format(part="1 из 1", repo=repo.name, chunk=diff))
+    else:
+        out = codex(["exec", "review"] + (["--commit", commit] if commit else ["--base", base]), repo)
     if out:
         return "codex", out
     chunks = split_diff(diff)
@@ -162,11 +179,12 @@ def review(repo: Path, base: str | None, commit: str | None, chain=TEXT_CHAIN, c
     return "", ""
 
 
-def ask(prompt: str, chain=TEXT_CHAIN, codex=codex_exec, allow_pii: bool = False) -> tuple:
-    block = pii_block(prompt, allow_pii)
-    if block:
-        return "", block
-    out = codex(["exec", "--skip-git-repo-check", "-s", "read-only", "-"], Path.cwd(), stdin=prompt)
+def ask(prompt: str, chain=TEXT_CHAIN, codex=codex_exec) -> tuple:
+    prompt, hidden = redact(prompt)
+    if hidden:
+        print(f"⚠ скрыто {hidden} e-mail/телефонов", flush=True)
+    with tempfile.TemporaryDirectory() as tmp:          # пустой каталог: Codex не читает чужие файлы
+        out = codex(["exec", "--skip-git-repo-check", "-s", "read-only", "-"], Path(tmp), stdin=prompt)
     if out:
         return "codex", out
     for who, fn in chain:
@@ -202,16 +220,14 @@ def main(argv=None) -> int:
     g.add_argument("--commit")
     ak = sub.add_parser("ask")
     ak.add_argument("text")
-    for sp in (rv, ak):
-        sp.add_argument("--allow-pii", action="store_true", help="в тексте нет персональных данных, проверено человеком")
     sub.add_parser("status")
     a = ap.parse_args(argv)
     if a.cmd == "status":
         return status()
     if a.cmd == "review":
-        who, body = review(a.repo.resolve(), a.base, a.commit, allow_pii=a.allow_pii)
+        who, body = review(a.repo.resolve(), a.base, a.commit)
     else:
-        who, body = ask(sys.stdin.read() if a.text == "-" else a.text, allow_pii=a.allow_pii)
+        who, body = ask(sys.stdin.read() if a.text == "-" else a.text)
     if not who:
         print(f"Второе мнение недоступно: {body or 'ни одно звено цепочки не ответило, проверь `status`'}. Готовым не считать.")
         return 2
