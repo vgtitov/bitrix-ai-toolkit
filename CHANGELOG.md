@@ -5,6 +5,9 @@
 ## [Unreleased]
 
 ### Added
+- Второе мнение другой моделью: `scripts/second_opinion.py` (Codex → Copilot или иной ассистент → модель без
+  обучения, только настроенное) и `scripts/codex_setup.py` (плагин Codex и CLI, проверка геоблока OpenAI);
+  ставится `install.sh`, отказ — `--no-codex`.
 - Лестница «минимально достаточного решения» для аналитика и архитектора (`bitrix-analyst/references/solution-ladder.md`):
   аналог Ponytail для анализа и проектирования. Сокращает решение, а не документ.
 - Дисциплина выполнения: Stop-хук `scripts/discipline_gate.py` (код без проверки, обещание без действия, «готово»
