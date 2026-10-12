@@ -90,6 +90,7 @@ for a in "$@"; do
   [ "$a" = "--with-ponytail" ] && WITH_PONYTAIL=1
   prev="$a"
 done
+case "$PONYTAIL_MODE" in off|lite|full|ultra) ;; *) echo "  ! --ponytail-mode: нужен off|lite|full|ultra"; exit 1;; esac
 if [ "$WITH_PONYTAIL" = 1 ]; then
   say "Ponytail (режим $PONYTAIL_MODE) + правило «сначала проверь, что уже есть»"
   python3 scripts/ponytail_setup.py --mode "$PONYTAIL_MODE" --project "$PT_PROJECT" || echo "  ! ponytail_setup с ошибкой (не критично)"

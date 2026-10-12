@@ -151,6 +151,7 @@ def main(argv: list[str] | None = None) -> int:
         print("  [ok] " + write_rule(a.project, a.dry_run))
     if a.no_plugin:
         return 0
+    installed = False
     for name, (disabled, steps) in AGENTS.items():
         exe = shutil.which(name)
         if not exe:
@@ -159,9 +160,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  [=] {name}: {PLUGIN} выключен пользователем, не включаю")
         elif all(run([exe, *s], a.dry_run) for s in steps):
             print(f"  [ok] {name}: {PLUGIN}")
+            installed = True
         else:
             print(f"  [!] {name}: не поставился (сеть?), вручную: {name} " + " ; ".join(" ".join(s) for s in steps))
-    print("  [ok] " + set_default_mode(a.mode, a.dry_run))
+    if installed:
+        print("  [ok] " + set_default_mode(a.mode, a.dry_run))
     if not shutil.which("node"):
         print("  [!] node не найден: хуки Ponytail молчат, скиллы /ponytail работают")
     return 0  # установка Ponytail необязательна и не должна валить онбординг

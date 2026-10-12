@@ -38,8 +38,19 @@ def _run():
         (t / "codex" / "config.toml").write_text('[plugins."ponytail@ponytail"]\nenabled = true\n[x]\nenabled = false\n')
         assert not ps.codex_disabled()
 
-        # режим пишется один раз, чужие ключи и выбор пользователя сохраняются
+        # без установленного плагина режим не пишется
         cfg = t / "xdg" / "ponytail" / "config.json"
+        ps.main(["--mode", "lite"])
+        assert not cfg.exists()
+
+        # фальшивый claude: «установка» успешна; codex по-прежнему выключен руками
+        (t / "empty").mkdir()
+        fake = t / "empty" / "claude"
+        fake.write_text("#!/bin/sh\nexit 0\n")
+        fake.chmod(0o755)
+        (t / "claude" / "settings.json").write_text("{}")
+
+        # режим пишется один раз, чужие ключи и выбор пользователя сохраняются
         cfg.parent.mkdir(parents=True)
         cfg.write_text('{"hideStatus": true}')
         ps.main(["--mode", "lite"])
