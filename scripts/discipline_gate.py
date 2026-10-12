@@ -40,8 +40,8 @@ POLITE = ("готов помочь", "готов ответить", "готов 
 EVIDENCE_RE = re.compile(r"https?://|\.(?:md|pdf|docx|xlsx|txt|csv)\b|/[\w.\-]+/[\w.\-]+|источник|согласно|"
                          r"цитат|см\.|\bsource\b|according to", re.IGNORECASE)
 
-MSG_CODE = ("Дисциплина: код изменён, а проверка не запускалась. Прогони проверку (тесты, BSL LS, "
-            "смоук, линтер) и покажи вывод, прежде чем говорить «готово».")
+MSG_CODE = ("Дисциплина: код изменён, а проверка не запускалась или упала. Прогони проверку (тесты, BSL LS, "
+            "смоук, линтер), добейся прохода и покажи вывод, прежде чем говорить «готово».")
 MSG_PROMISE = ("Дисциплина: ход кончается обещанием без исполнения. Сделай обещанное сейчас "
                "или прямо скажи, что откладываешь и почему.")
 MSG_NONDEV = ("Дисциплина: заявлено «готово», но нет файла с результатом и источников. Сохрани результат "
@@ -84,14 +84,26 @@ def current_turn(entries: list) -> list:
     return entries
 
 
+def _failed_ids(turn: list) -> set:
+    """id вызовов инструментов, которые вернули ошибку."""
+    return {b.get("tool_use_id") for e in turn if e.get("type") == "user" for b in _blocks(e)
+            if b.get("type") == "tool_result" and b.get("is_error")}
+
+
 def _tool_uses(turn: list) -> list:
-    return [b for e in turn if e.get("type") == "assistant" for b in _blocks(e) if b.get("type") == "tool_use"]
+    """Успешные вызовы инструментов хода; неудачная запись файла не считается ни правкой, ни результатом."""
+    failed = _failed_ids(turn)
+    return [b for e in turn if e.get("type") == "assistant" for b in _blocks(e)
+            if b.get("type") == "tool_use" and b.get("id") not in failed]
 
 
 def _is_code(path: str) -> bool:
     low = path.lower().replace("\\", "/")
     base = low.rsplit("/", 1)[-1]
-    if base.startswith("test_") or "/tests/" in low or "/test/" in low or base.endswith("_test.py"):
+    # тест узнаём по имени файла и каталогу tests/; каталог test/ бывает и у обычного кода
+    if (base.startswith("test_") or "/tests/" in low or low.startswith("tests/")
+            or re.search(r"(_test|\.test|\.spec)\.[a-z]+$", base)
+            or re.search(r"Tests?\.php$", path.replace("\\", "/").rsplit("/", 1)[-1])):
         return False
     return low.endswith(CODE_EXT)
 
@@ -106,10 +118,28 @@ def code_edited(uses: list) -> bool:
     return False
 
 
+READERS = {"echo", "printf", "cat", "grep", "rg", "head", "tail", "less", "more", "ls", "sed", "awk", "find",
+           "git", "type", "get-content", "select-string", "write-host"}
+
+
+def _runs_check(command: str) -> bool:
+    """Проверка именно запускается: в отрезке команды есть признак проверки и он не просто читается."""
+    for seg in re.split(r"&&|\|\||[;|\n]", command.lower()):
+        words = [w for w in seg.split() if "=" not in w or w.startswith("-")]
+        if words and words[0] == "cd":
+            continue
+        if words and words[0] not in READERS and any(tok in seg for tok in VERIFY):
+            return True
+    return False
+
+
 def verified(uses: list) -> bool:
     for u in uses:
-        hay = (u.get("name", "") + " " + str((u.get("input") or {}).get("command", ""))).lower()
-        if any(tok in hay for tok in VERIFY):
+        name = u.get("name", "")
+        if name in ("Bash", "PowerShell"):
+            if _runs_check(str((u.get("input") or {}).get("command", ""))):
+                return True
+        elif any(tok in name.lower() for tok in VERIFY):      # MCP: bsl-ls, get_project_errors…
             return True
     return False
 
@@ -124,12 +154,12 @@ def last_reply(turn: list) -> tuple[str, bool]:
     for e in reversed(turn):
         if e.get("type") != "assistant":
             continue
-        blocks = _blocks(e)
-        texts = [b.get("text", "") for b in blocks if b.get("type") == "text"]
-        if texts:
-            return " ".join(texts), False
-        if any(b.get("type") == "tool_use" for b in blocks):
+        blocks = [b for b in _blocks(e) if b.get("type") in ("text", "tool_use")]
+        if not blocks:
+            continue
+        if blocks[-1].get("type") == "tool_use":        # после текста в том же ответе вызван инструмент
             return "", True
+        return " ".join(b.get("text", "") for b in blocks if b.get("type") == "text"), False
     return "", False
 
 

@@ -74,8 +74,9 @@ sh onboard/install.sh --project /путь         # куда дописать п
 Stop-хук `scripts/discipline_gate.py` не даёт закончить ход «на словах»: код изменён без проверки (`php -l`,
 phpunit, phpstan, линтер), ход кончается обещанием без действия, «готово» в не-код задаче без файла и источников.
 Смотрит только текущий ход. `install.sh` ставит его в `~/.claude/settings.json`, работает во всех проектах.
-Режим — `AI_TOOLKIT_DISCIPLINE`: `warn` по умолчанию, `enforce`, `off`. Отказ: `--no-discipline` или
-`"env": {"AI_TOOLKIT_DISCIPLINE": "off"}` в своих настройках, установщик его не перебивает.
+Режим — `AI_TOOLKIT_DISCIPLINE`: `warn` по умолчанию, `enforce`, `off`. Не ставить: `--no-discipline`.
+Выключить насовсем: `"env": {"AI_TOOLKIT_DISCIPLINE": "off"}` в своих настройках, установщик его не перебивает.
+Убрать хук: `python3 scripts/discipline_gate.py uninstall`.
 
 ## Идея
 У Битрикс два поколения ядра (процедурное + D7), много legacy, фрагментированная документация и **нет официальных

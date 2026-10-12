@@ -111,9 +111,9 @@ fi
 
 # 5в. Дисциплина: Stop-хук «готово только с проверкой» в ~/.claude/settings.json (во всех проектах)
 if [ "$WITH_DISCIPLINE" = 1 ]; then
-  say "Дисциплина (режим warn; AI_TOOLKIT_DISCIPLINE=off|warn|enforce; отключить: --no-discipline)"
+  say "Дисциплина (режим warn; AI_TOOLKIT_DISCIPLINE=off|warn|enforce; не ставить: --no-discipline; убрать: discipline_gate.py uninstall)"
   python3 scripts/discipline_gate.py install || echo "  ! discipline_gate с ошибкой (не критично)"
-else python3 scripts/discipline_gate.py uninstall || true; fi
+fi
 
 # 6. Самотест
 say "Самотест"

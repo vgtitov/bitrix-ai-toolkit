@@ -18,13 +18,14 @@ def user(text):
     return {"type": "user", "message": {"role": "user", "content": text}}
 
 
-def tool(name, **inp):
+def tool(name, _id="t", **inp):
     return {"type": "assistant", "message": {"role": "assistant",
-            "content": [{"type": "tool_use", "name": name, "input": inp}]}}
+            "content": [{"type": "tool_use", "id": _id, "name": name, "input": inp}]}}
 
 
-def result():
-    return {"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "content": "ok"}]}}
+def result(_id="t", error=False):
+    return {"type": "user", "message": {"role": "user",
+            "content": [{"type": "tool_result", "tool_use_id": _id, "content": "ok", "is_error": error}]}}
 
 
 def say(text):
@@ -58,6 +59,24 @@ def test_decide():
     assert dg.decide(dg.current_turn(work + [say("Готово, вывод по docs/a.md")])) == ""
     assert dg.decide(dg.current_turn(work + [tool("Write", file_path="out/разбор.md"), result(),
                                              say("Готово")])) == ""
+    # упавшая проверка не засчитывается; каталог test/ у обычного кода — это код
+    assert dg.decide(dg.current_turn([user("x"), edit, result(), tool("Bash", _id="p", command="pytest -q"),
+                                      result("p", error=True), say("Готово")])) == dg.MSG_CODE
+    assert dg._is_code("src/test/service.py") and not dg._is_code("src/OrderTest.php")
+    assert dg._is_code("tools/latest.py") and dg._is_code("Contest.bsl")
+    assert not dg._is_code("tests/fixtures/a.bsl") and not dg._is_code("web/cart.spec.ts")
+    # чтение слова pytest — не проверка; запуск через cd && uv run — проверка
+    for cmd, ok in (("echo pytest", False), ("grep -r pytest README.md", False), ("cat pytest.log", False),
+                    ("cd tests && uv run --with pytest python -m pytest -q", True), ("FOO=1 bsl-ls --check x", True)):
+        turn = [user("x"), edit, result(), tool("Bash", command=cmd), result(), say("Готово")]
+        assert (dg.decide(dg.current_turn(turn)) == "") is ok, cmd
+    # текст и вызов инструмента в одном ответе — не обещание
+    both = {"type": "assistant", "message": {"role": "assistant", "content": [
+        {"type": "text", "text": "Сейчас сделаю"}, {"type": "tool_use", "id": "z", "name": "Read", "input": {}}]}}
+    assert dg.decide(dg.current_turn([user("x"), both])) == ""
+    # запись результата с ошибкой не засчитывается
+    assert dg.decide(dg.current_turn(work + [tool("Write", _id="w", file_path="out/r.md"), result("w", error=True),
+                                             say("Готово")])) == dg.MSG_NONDEV
     # вежливость и короткий разговор не трогаем
     assert dg.decide(dg.current_turn([user("привет"), say("Готов помочь")])) == ""
 
