@@ -4,6 +4,9 @@
 #
 # Запуск:  sh onboard/install.sh              # всё
 #          sh onboard/install.sh --no-tools   # без установки инструментов (только хуки+скиллы+сборка)
+#          sh onboard/install.sh --with-ponytail [--ponytail-mode full] [--project DIR]
+#                                             # НЕОБЯЗАТЕЛЬНО: плагин Ponytail + правило «сначала проверь,
+#                                             # что уже есть» в AGENTS.md проекта. Без флага не ставится.
 set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INVOKED_FROM="$(pwd)"   # откуда запустили — там может быть проект
@@ -79,6 +82,18 @@ echo "  режим проверок сейчас: $(python3 scripts/checks_confi
 # 5. Сборка конфигов под агентов
 say "Сборка конфигов (build.sh)"
 sh build.sh >/dev/null 2>&1 && echo "  CLAUDE.md/AGENTS.md/.mcp.json/.claude готовы" || echo "  ! build.sh с ошибкой"
+
+# 5б. Необязательно: Ponytail и правило «сначала проверь, что уже есть» (только по --with-ponytail)
+WITH_PONYTAIL=0; PONYTAIL_MODE=lite; PT_PROJECT="$INVOKED_FROM"; prev=""
+for a in "$@"; do
+  case "$prev" in --ponytail-mode) PONYTAIL_MODE="$a" ;; --project) PT_PROJECT="$a" ;; esac
+  [ "$a" = "--with-ponytail" ] && WITH_PONYTAIL=1
+  prev="$a"
+done
+if [ "$WITH_PONYTAIL" = 1 ]; then
+  say "Ponytail (режим $PONYTAIL_MODE) + правило «сначала проверь, что уже есть»"
+  python3 scripts/ponytail_setup.py --mode "$PONYTAIL_MODE" --project "$PT_PROJECT" || echo "  ! ponytail_setup с ошибкой (не критично)"
+fi
 
 # 6. Самотест
 say "Самотест"

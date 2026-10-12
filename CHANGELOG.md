@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### Added
+- Необязательно, по флагу установщика: плагин [Ponytail](https://github.com/DietrichGebert/ponytail) (MIT) для
+  Claude Code и Codex и правило «сначала проверь, что уже есть» под Битрикс
+  (`core/optional/check-existing-first.md`), `scripts/ponytail_setup.py`. Без флага установка и поведение агентов
+  не меняются; `core/AGENTS.md` и скиллы не тронуты.
+
 ### Changed
 - `LICENSE` содержит только текст MIT; оговорка о товарных знаках перенесена в `NOTICE.md`, чтобы GitHub и каталоги
   распознавали лицензию.

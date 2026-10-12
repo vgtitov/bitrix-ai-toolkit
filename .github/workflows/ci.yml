@@ -20,6 +20,9 @@ jobs:
       - name: Функциональные тесты (детектор N+1)
         run: python3 tests/test_bitrix_guard.py
 
+      - name: Необязательный Ponytail-установщик (не трогает чужие настройки)
+        run: python3 tests/test_ponytail_setup.py
+
       - name: Сборка конфигов из core/
         run: sh build.sh
 
