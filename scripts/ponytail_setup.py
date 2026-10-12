@@ -75,7 +75,7 @@ def set_default_mode(mode: str, dry: bool) -> str:
         data = {}
     except (OSError, ValueError):
         return f"{path}: не читается, не трогаю"
-    if data.get("defaultMode"):
+    if "defaultMode" in data:
         return f"режим уже задан: {data['defaultMode']} ({path}), не трогаю"
     data["defaultMode"] = mode
     if not dry:
@@ -88,10 +88,14 @@ def write_rule(project: Path, dry: bool) -> str:
     project = project.resolve()
     if project == ROOT:
         return "правило: проект не указан (это каталог набора), пропуск; передай --project <каталог проекта>"
+    if not project.is_dir():
+        return f"правило: каталога {project} нет, пропуск"
     target = project / "AGENTS.md"
     old = target.read_text(encoding="utf-8") if target.exists() else ""
     block = f"{BEGIN}\n{RULE.read_text(encoding='utf-8').strip()}\n{END}\n"
-    if BEGIN in old and END in old:
+    if old.count(BEGIN) != old.count(END) or old.count(BEGIN) > 1 or old.find(END) < old.find(BEGIN):
+        return f"правило: метки check-existing-first в {target} повреждены, не трогаю; поправь руками"
+    if BEGIN in old:
         head, rest = old.split(BEGIN, 1)
         new = head + block + rest.split(END, 1)[1].lstrip("\n")
     else:

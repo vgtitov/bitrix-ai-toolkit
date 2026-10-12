@@ -57,6 +57,12 @@ def _run():
         assert text.startswith("# мои правила\n") and text.count(ps.BEGIN) == 1
         assert "Ponytail" in text
 
+        # повреждённые метки не трогаем, несуществующий каталог не валит
+        (proj / "AGENTS.md").write_text(ps.BEGIN + "\nстарое\n")
+        ps.main(["--no-plugin", "--project", str(proj)])
+        assert (proj / "AGENTS.md").read_text() == ps.BEGIN + "\nстарое\n"
+        ps.main(["--no-plugin", "--project", str(t / "nope")])
+
         # каталог самого набора не трогаем
         before = (ps.ROOT / "AGENTS.md").read_bytes()
         ps.main(["--no-plugin", "--project", str(ps.ROOT)])
