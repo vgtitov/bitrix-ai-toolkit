@@ -14,6 +14,15 @@ prev_arg=""
 cd "$ROOT"
 WITH_TOOLS=1
 [ "${1:-}" = "--no-tools" ] && WITH_TOOLS=0
+# Необязательный Ponytail (шаг 5б): только по --with-ponytail
+WITH_PONYTAIL=0; PONYTAIL_MODE=lite; PT_PROJECT="$INVOKED_FROM"; prev=""
+for a in "$@"; do
+  case "$prev" in --ponytail-mode) PONYTAIL_MODE="$a" ;; --project) PT_PROJECT="$a" ;; esac
+  [ "$a" = "--with-ponytail" ] && WITH_PONYTAIL=1
+  prev="$a"
+done
+case "$PONYTAIL_MODE" in off|lite|full|ultra) ;; *) echo "  ! --ponytail-mode: нужен off|lite|full|ultra"; exit 1;; esac
+case "$PT_PROJECT" in /*) ;; *) PT_PROJECT="$INVOKED_FROM/$PT_PROJECT" ;; esac   # дальше cd в корень набора
 
 say() { printf "\n\033[36m[onboard] %s\033[0m\n" "$1"; }
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -84,13 +93,6 @@ say "Сборка конфигов (build.sh)"
 sh build.sh >/dev/null 2>&1 && echo "  CLAUDE.md/AGENTS.md/.mcp.json/.claude готовы" || echo "  ! build.sh с ошибкой"
 
 # 5б. Необязательно: Ponytail и правило «сначала проверь, что уже есть» (только по --with-ponytail)
-WITH_PONYTAIL=0; PONYTAIL_MODE=lite; PT_PROJECT="$INVOKED_FROM"; prev=""
-for a in "$@"; do
-  case "$prev" in --ponytail-mode) PONYTAIL_MODE="$a" ;; --project) PT_PROJECT="$a" ;; esac
-  [ "$a" = "--with-ponytail" ] && WITH_PONYTAIL=1
-  prev="$a"
-done
-case "$PONYTAIL_MODE" in off|lite|full|ultra) ;; *) echo "  ! --ponytail-mode: нужен off|lite|full|ultra"; exit 1;; esac
 if [ "$WITH_PONYTAIL" = 1 ]; then
   say "Ponytail (режим $PONYTAIL_MODE) + правило «сначала проверь, что уже есть»"
   python3 scripts/ponytail_setup.py --mode "$PONYTAIL_MODE" --project "$PT_PROJECT" || echo "  ! ponytail_setup с ошибкой (не критично)"
