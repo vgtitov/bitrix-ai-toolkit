@@ -18,14 +18,16 @@ def test_generated_off_is_not_opt_out():
     try:
         with tempfile.TemporaryDirectory() as t:
             os.environ["XDG_CONFIG_HOME"] = t
-            cfg = Path(t) / "ponytail" / "config.json"
-            cfg.parent.mkdir(parents=True)
-            cfg.write_text(json.dumps({"defaultMode": "off", ps.SET_BY_KEY: "off"}))
-            assert not ps.user_turned_off()          # off аналитика от установщика
-            cfg.write_text(json.dumps({"defaultMode": "off", ps.SET_BY_KEY: "lite"}))
-            assert ps.user_turned_off()              # человек сам сменил lite на off
+            cfg = ps.ponytail_config_path()
+            ps.set_default_mode("off", dry=False)        # аналитик: off пишет установщик
+            assert not ps.user_turned_off()
+            os.utime(cfg, ns=(cfg.stat().st_atime_ns, cfg.stat().st_mtime_ns + 10**9))
+            assert ps.user_turned_off()                  # конфиг трогал человек: его off — отказ
+            ps.marker_path().unlink()
             cfg.write_text(json.dumps({"defaultMode": "off"}))
-            assert ps.user_turned_off()              # off без метки — выбор человека
+            assert ps.user_turned_off()                  # off без метки — выбор человека
+            cfg.write_text(json.dumps({"defaultMode": "lite"}))
+            assert not ps.user_turned_off()
     finally:
         os.environ.clear()
         os.environ.update(saved)
@@ -94,7 +96,7 @@ def _run():
         cfg.parent.mkdir(parents=True)
         cfg.write_text('{"hideStatus": true}')
         ps.main(["--mode", "lite"])
-        assert json.loads(cfg.read_text()) == {"hideStatus": True, "defaultMode": "lite", ps.SET_BY_KEY: "lite"}
+        assert json.loads(cfg.read_text()) == {"hideStatus": True, "defaultMode": "lite"}
         ps.main(["--mode", "full"])
         assert json.loads(cfg.read_text())["defaultMode"] == "lite"
 
@@ -143,5 +145,7 @@ def _run():
 
 
 if __name__ == "__main__":
+    test_generated_off_is_not_opt_out()
+    test_rule_block_rejects_broken_markers()
     test_all()
     print("OK: ponytail_setup")

@@ -37,8 +37,6 @@ MODES = ("off", "lite", "full", "ultra")
 ROOT = Path(__file__).resolve().parents[1]
 RULE_SRC = ROOT / "core" / "AGENTS.md"
 BEGIN, END = "<!-- check-existing-first:begin -->", "<!-- check-existing-first:end -->"
-# какой режим записал сам установщик: так off аналитика по роли не путается с отказом человека
-SET_BY_KEY = "aiToolkitDefault"
 
 
 def claude_disabled() -> bool:
@@ -90,10 +88,11 @@ def set_default_mode(mode: str, dry: bool) -> str:
     if "defaultMode" in data:
         return f"режим уже задан: {data['defaultMode']} ({path}), не трогаю"
     data["defaultMode"] = mode
-    data[SET_BY_KEY] = mode
     if not dry:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        # метка рядом, а не внутри: Ponytail не трогает чужой файл, а любая правка конфига меняет mtime
+        marker_path().write_text(json.dumps({"mode": mode, "mtime_ns": path.stat().st_mtime_ns}), encoding="utf-8")
     return f"режим по умолчанию: {mode} ({path})"
 
 
@@ -109,14 +108,25 @@ def rule_block() -> str:
     return BEGIN + src.split(BEGIN, 1)[1].split(END, 1)[0] + END + "\n"
 
 
+def marker_path() -> Path:
+    return ponytail_config_path().with_name("ai-toolkit-default.json")
+
+
 def user_turned_off() -> bool:
-    # off, который записал сам установщик по роли (аналитик), — не отказ: плагин можно доставить
-    # в агент, появившийся позже; режим при этом остаётся off. Отказ — off, выбранный человеком.
+    # off, который записал сам установщик по роли (аналитик), и конфиг с тех пор не менялся — не отказ:
+    # плагин можно доставить в агент, появившийся позже, режим остаётся off. Отказ — off, выбранный человеком.
+    path = ponytail_config_path()
     try:
-        data = json.loads(ponytail_config_path().read_text(encoding="utf-8-sig"))
-        return data.get("defaultMode") == "off" and data.get(SET_BY_KEY) != "off"
+        if json.loads(path.read_text(encoding="utf-8-sig")).get("defaultMode") != "off":
+            return False
+        mtime = path.stat().st_mtime_ns
     except (OSError, ValueError, AttributeError):
         return False
+    try:
+        mark = json.loads(marker_path().read_text(encoding="utf-8"))
+        return not (mark.get("mode") == "off" and mark.get("mtime_ns") == mtime)
+    except (OSError, ValueError, AttributeError):
+        return True
 
 
 def write_rule(project: Path, dry: bool) -> str:
