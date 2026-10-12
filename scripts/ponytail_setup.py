@@ -51,7 +51,14 @@ def codex_disabled() -> bool:
         text = (base / "config.toml").read_text(encoding="utf-8")
     except OSError:
         return False
-    # ponytail: регэксп вместо tomllib — работает и на Python < 3.11
+    try:
+        import tomllib
+        try:
+            return (tomllib.loads(text).get("plugins") or {}).get(PLUGIN, {}).get("enabled") is False
+        except tomllib.TOMLDecodeError:
+            return False
+    except ImportError:  # Python < 3.11: грубая проверка регэкспом
+        pass
     m = re.search(r'^\[plugins\."ponytail@ponytail"\]\s*\n((?:(?!\[).*\n?)*)', text, re.M)
     return bool(m and re.search(r"^\s*enabled\s*=\s*false\b", m.group(1), re.M))
 
@@ -91,7 +98,10 @@ def write_rule(project: Path, dry: bool) -> str:
     if not project.is_dir():
         return f"правило: каталога {project} нет, пропуск"
     target = project / "AGENTS.md"
-    old = target.read_text(encoding="utf-8") if target.exists() else ""
+    try:
+        old = target.read_text(encoding="utf-8") if target.exists() else ""
+    except (OSError, UnicodeError) as e:
+        return f"правило: {target} не читается ({e}), не трогаю"
     block = f"{BEGIN}\n{RULE.read_text(encoding='utf-8').strip()}\n{END}\n"
     if old.count(BEGIN) != old.count(END) or old.count(BEGIN) > 1 or old.find(END) < old.find(BEGIN):
         return f"правило: метки check-existing-first в {target} повреждены, не трогаю; поправь руками"
