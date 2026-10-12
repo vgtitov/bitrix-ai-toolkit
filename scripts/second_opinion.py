@@ -95,7 +95,13 @@ def copilot(prompt: str) -> str | None:
                 os.killpg(proc.pid, 9)
             except (ProcessLookupError, PermissionError):
                 pass                                   # успел завершиться сам
-        proc.communicate()
+        try:
+            proc.communicate(timeout=10)                   # дочитать, но не ждать вечно
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            for pipe in (proc.stdin, proc.stdout, proc.stderr):
+                if pipe:
+                    pipe.close()
         print("⚠ Copilot: таймаут", flush=True)
         return None
     return out if proc.returncode == 0 and out.strip() else None
