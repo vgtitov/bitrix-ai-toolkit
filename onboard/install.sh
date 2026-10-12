@@ -7,6 +7,7 @@
 #          sh onboard/install.sh --role analyst   # роль (или env BITRIX_ROLE): developer (по умолч.) | analyst
 #                                             # Ponytail: developer → lite, analyst → off; явно: --ponytail-mode
 #          sh onboard/install.sh --no-ponytail    # без плагина Ponytail
+#          sh onboard/install.sh --no-discipline  # без Stop-хука дисциплины (иначе ставится, режим warn)
 #          --project DIR                          # куда дописать правило в AGENTS.md (иначе каталог запуска,
 #                                                 # если в нём composer.json)
 set -eu
@@ -17,10 +18,11 @@ cd "$ROOT"
 WITH_TOOLS=1
 [ "${1:-}" = "--no-tools" ] && WITH_TOOLS=0
 # Ponytail (шаг 5б): по умолчанию ставится; режим по роли; --no-ponytail — без него
-WITH_PONYTAIL=1; PONYTAIL_MODE=""; BITRIX_ROLE="${BITRIX_ROLE:-developer}"; PT_PROJECT=""; prev=""
+WITH_PONYTAIL=1; WITH_DISCIPLINE=1; PONYTAIL_MODE=""; BITRIX_ROLE="${BITRIX_ROLE:-developer}"; PT_PROJECT=""; prev=""
 for a in "$@"; do
   case "$prev" in --ponytail-mode) PONYTAIL_MODE="$a" ;; --project) PT_PROJECT="$a" ;; --role) BITRIX_ROLE="$a" ;; esac
   [ "$a" = "--no-ponytail" ] && WITH_PONYTAIL=0
+  [ "$a" = "--no-discipline" ] && WITH_DISCIPLINE=0
   prev="$a"
 done
 [ "$WITH_PONYTAIL" = 0 ] && [ -n "$PONYTAIL_MODE" ] && { echo "  ! --no-ponytail и --ponytail-mode вместе не имеют смысла"; exit 1; }
@@ -107,11 +109,18 @@ elif [ -n "$PT_PROJECT" ]; then
   python3 scripts/ponytail_setup.py --no-plugin --project "$PT_PROJECT" || true   # правило «только код» нужно всегда
 fi
 
+# 5в. Дисциплина: Stop-хук «готово только с проверкой» в ~/.claude/settings.json (во всех проектах)
+if [ "$WITH_DISCIPLINE" = 1 ]; then
+  say "Дисциплина (режим warn; AI_TOOLKIT_DISCIPLINE=off|warn|enforce; отключить: --no-discipline)"
+  python3 scripts/discipline_gate.py install || echo "  ! discipline_gate с ошибкой (не критично)"
+else python3 scripts/discipline_gate.py uninstall || true; fi
+
 # 6. Самотест
 say "Самотест"
 if have python3; then
   python3 tests/test_bitrix_guard.py && echo "  bitrix_guard: OK" || echo "  ! bitrix_guard FAIL"
   python3 tests/test_ponytail_setup.py >/dev/null && echo "  ponytail: OK (роль аналитика: документы не сокращаются)" || echo "  ! ponytail FAIL"
+  python3 tests/test_discipline_gate.py >/dev/null && echo "  discipline: OK" || echo "  ! discipline FAIL"
 fi
 if have ast-grep || have sg; then
   AG=$(command -v ast-grep || command -v sg)

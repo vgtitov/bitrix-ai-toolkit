@@ -5,6 +5,11 @@
 ## [Unreleased]
 
 ### Added
+- Лестница «минимально достаточного решения» для аналитика и архитектора (`bitrix-analyst/references/solution-ladder.md`):
+  аналог Ponytail для анализа и проектирования. Сокращает решение, а не документ.
+- Дисциплина выполнения: Stop-хук `scripts/discipline_gate.py` (код без проверки, обещание без действия, «готово»
+  без результата), ставится `install.sh` в пользовательские настройки Claude Code, режим `warn`, отказ —
+  `--no-discipline` или `AI_TOOLKIT_DISCIPLINE=off`.
 - Плагин [Ponytail](https://github.com/DietrichGebert/ponytail) (MIT) для Claude Code и Codex ставится установщиком
   и обновлением по умолчанию (`scripts/ponytail_setup.py`; отключить — `--no-ponytail`). Режим по роли, аналитику
   `off`. Выключенный руками не включается обратно.
