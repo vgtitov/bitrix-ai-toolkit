@@ -4,9 +4,11 @@
 #
 # Запуск:  sh onboard/install.sh              # всё
 #          sh onboard/install.sh --no-tools   # без установки инструментов (только хуки+скиллы+сборка)
-#          sh onboard/install.sh --with-ponytail [--ponytail-mode full] [--project DIR]
-#                                             # НЕОБЯЗАТЕЛЬНО: плагин Ponytail + правило «сначала проверь,
-#                                             # что уже есть» в AGENTS.md проекта. Без флага не ставится.
+#          sh onboard/install.sh --role analyst   # роль (или env BITRIX_ROLE): developer (по умолч.) | analyst
+#                                             # Ponytail: developer → lite, analyst → off; явно: --ponytail-mode
+#          sh onboard/install.sh --no-ponytail    # без плагина Ponytail
+#          --project DIR                          # куда дописать правило в AGENTS.md (иначе каталог запуска,
+#                                                 # если в нём composer.json)
 set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INVOKED_FROM="$(pwd)"   # откуда запустили — там может быть проект
@@ -14,15 +16,18 @@ prev_arg=""
 cd "$ROOT"
 WITH_TOOLS=1
 [ "${1:-}" = "--no-tools" ] && WITH_TOOLS=0
-# Необязательный Ponytail (шаг 5б): только по --with-ponytail
-WITH_PONYTAIL=0; PONYTAIL_MODE=lite; PT_PROJECT="$INVOKED_FROM"; prev=""
+# Ponytail (шаг 5б): по умолчанию ставится; режим по роли; --no-ponytail — без него
+WITH_PONYTAIL=1; PONYTAIL_MODE=""; BITRIX_ROLE="${BITRIX_ROLE:-developer}"; PT_PROJECT=""; prev=""
 for a in "$@"; do
-  case "$prev" in --ponytail-mode) PONYTAIL_MODE="$a" ;; --project) PT_PROJECT="$a" ;; esac
-  [ "$a" = "--with-ponytail" ] && WITH_PONYTAIL=1
+  case "$prev" in --ponytail-mode) PONYTAIL_MODE="$a" ;; --project) PT_PROJECT="$a" ;; --role) BITRIX_ROLE="$a" ;; esac
+  [ "$a" = "--no-ponytail" ] && WITH_PONYTAIL=0
   prev="$a"
 done
-case "$PONYTAIL_MODE" in off|lite|full|ultra) ;; *) echo "  ! --ponytail-mode: нужен off|lite|full|ultra"; exit 1;; esac
-case "$PT_PROJECT" in /*) ;; *) PT_PROJECT="$INVOKED_FROM/$PT_PROJECT" ;; esac   # дальше cd в корень набора
+case "$PONYTAIL_MODE" in ""|off|lite|full|ultra) ;; *) echo "  ! --ponytail-mode: нужен off|lite|full|ultra"; exit 1;; esac
+case "$BITRIX_ROLE" in developer|analyst) ;; *) echo "  ! --role: нужен developer|analyst"; exit 1;; esac
+export BITRIX_ROLE
+[ -z "$PT_PROJECT" ] && [ -f "$INVOKED_FROM/composer.json" ] && PT_PROJECT="$INVOKED_FROM"
+case "$PT_PROJECT" in ""|/*) ;; *) PT_PROJECT="$INVOKED_FROM/$PT_PROJECT" ;; esac   # дальше cd в корень набора
 
 say() { printf "\n\033[36m[onboard] %s\033[0m\n" "$1"; }
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -92,16 +97,20 @@ echo "  режим проверок сейчас: $(python3 scripts/checks_confi
 say "Сборка конфигов (build.sh)"
 sh build.sh >/dev/null 2>&1 && echo "  CLAUDE.md/AGENTS.md/.mcp.json/.claude готовы" || echo "  ! build.sh с ошибкой"
 
-# 5б. Необязательно: Ponytail и правило «сначала проверь, что уже есть» (только по --with-ponytail)
+# 5б. Ponytail (только код; документы аналитика не сокращает) и правило «сначала проверь, что уже есть»
 if [ "$WITH_PONYTAIL" = 1 ]; then
-  say "Ponytail (режим $PONYTAIL_MODE) + правило «сначала проверь, что уже есть»"
-  python3 scripts/ponytail_setup.py --mode "$PONYTAIL_MODE" --project "$PT_PROJECT" || echo "  ! ponytail_setup с ошибкой (не критично)"
+  say "Ponytail (роль $BITRIX_ROLE, режим ${PONYTAIL_MODE:-по роли}; отключить: --no-ponytail)"
+  python3 scripts/ponytail_setup.py ${PONYTAIL_MODE:+--mode "$PONYTAIL_MODE"} ${PT_PROJECT:+--project "$PT_PROJECT"} \
+    || echo "  ! ponytail_setup с ошибкой (не критично)"
+elif [ -n "$PT_PROJECT" ]; then
+  python3 scripts/ponytail_setup.py --no-plugin --project "$PT_PROJECT" || true   # правило «только код» нужно всегда
 fi
 
 # 6. Самотест
 say "Самотест"
 if have python3; then
   python3 tests/test_bitrix_guard.py && echo "  bitrix_guard: OK" || echo "  ! bitrix_guard FAIL"
+  python3 tests/test_ponytail_setup.py >/dev/null && echo "  ponytail: OK (роль аналитика: документы не сокращаются)" || echo "  ! ponytail FAIL"
 fi
 if have ast-grep || have sg; then
   AG=$(command -v ast-grep || command -v sg)

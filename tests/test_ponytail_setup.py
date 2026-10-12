@@ -25,6 +25,8 @@ def test_all():
 def _run():
     with tempfile.TemporaryDirectory() as t:
         t = Path(t)
+        os.environ.pop("BITRIX_ROLE", None)
+        os.environ.pop("ONEC_ACTIVE_PROFILE", None)
         os.environ.update(XDG_CONFIG_HOME=str(t / "xdg"), CLAUDE_CONFIG_DIR=str(t / "claude"),
                           CODEX_HOME=str(t / "codex"), PATH=str(t / "empty"))
 
@@ -46,7 +48,7 @@ def _run():
         # фальшивый claude: «установка» успешна; codex по-прежнему выключен руками
         (t / "empty").mkdir()
         fake = t / "empty" / "claude"
-        fake.write_text("#!/bin/sh\nexit 0\n")
+        fake.write_text(f"#!/bin/sh\necho \"$@\" >> {t}/calls\nexit 0\n")
         fake.chmod(0o755)
         (t / "claude" / "settings.json").write_text("{}")
 
@@ -58,6 +60,16 @@ def _run():
         ps.main(["--mode", "full"])
         assert json.loads(cfg.read_text())["defaultMode"] == "lite"
 
+        # режим по роли: аналитик -> off, остальные и без роли -> lite; явный --mode главнее
+        assert ps.mode_for_role("analyst") == "off"
+        assert ps.mode_for_role("franchise") == ps.mode_for_role("") == ps.mode_for_role("developer") == "lite"
+
+        # выключил через /ponytail default off: обновление плагин не трогает
+        cfg.write_text('{"defaultMode": "off"}')
+        (t / "calls").unlink()
+        ps.main([])
+        assert not (t / "calls").exists()
+
         # правило: блок дописывается, повторный запуск его заменяет, а не дублирует
         proj = t / "proj"
         proj.mkdir()
@@ -67,6 +79,18 @@ def _run():
         text = (proj / "AGENTS.md").read_text()
         assert text.startswith("# мои правила\n") and text.count(ps.BEGIN) == 1
         assert "Ponytail" in text
+
+        # роль аналитика: его документ в AGENTS.md проекта не сокращается, правило только дописывается
+        passport = "# Паспорт задачи\n\n" + "".join(f"## Раздел {i}\nТребование {i}: подробное описание.\n\n" for i in range(50))
+        (proj / "AGENTS.md").write_text(passport)
+        ps.main(["--no-plugin", "--project", str(proj)])
+        assert (proj / "AGENTS.md").read_text().startswith(passport)
+        block = ps.rule_block()
+        assert "касаются только кода" in block and "Документы не сокращаются" in block
+        assert "Для аналитика" in block
+        for role in ("analyst", "tester"):
+            skill = next((ps.ROOT / "core" / "skills").glob(f"*-{role}")) / "SKILL.md"
+            assert "Ponytail здесь не сокращает" in skill.read_text(encoding="utf-8"), skill
 
         # повреждённые метки не трогаем, несуществующий каталог не валит
         (proj / "AGENTS.md").write_text(ps.BEGIN + "\nстарое\n")

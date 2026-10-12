@@ -32,36 +32,35 @@ sh onboard/install.sh            # инструменты + хуки + скил�
 > отдельный слой (`config/local/`, см. `docs/LOCALIZATION.md`), ядро остаётся обезличенным. Конвенции наполняются
 > по реальному коду ядра, а не по памяти.
 
-## Необязательно: Ponytail и правило «сначала проверь, что уже есть»
-
-Выключено по умолчанию: обычная установка ничего из этого не ставит, у команды поведение агентов не меняется.
+## Ponytail и правило «сначала проверь, что уже есть»
 
 - **[Ponytail](https://github.com/DietrichGebert/ponytail)** (MIT, автор Dietrich Gebert) — плагин для Claude Code и
   Codex: перед написанием кода агент проходит лестницу «нужно ли это вообще → есть ли уже готовое → минимум кода».
-  Ставится на пользователя, то есть действует во всех его проектах, не только в этом.
-- **Правило «сначала проверь, что уже есть»** — та же лестница под Битрикс: ядро и D7 API → модули проекта → компоненты и события → одна строка → минимум
-  ([core/optional/check-existing-first.md](core/optional/check-existing-first.md)). Мягкая рекомендация, без
-  запретов; валидацию, права и защиту данных не упрощает. Дописывается блоком в `AGENTS.md` проекта (`--project`, по умолчанию каталог запуска; каталог самого набора не трогается), который читают
-  Codex, Cursor, Copilot и Claude Code (через `@AGENTS.md` в `CLAUDE.md`). Для Gemini CLI подключи `AGENTS.md` в
-  `contextFileName` или скопируй блок в `GEMINI.md`.
+  Ставится установщиком вместе с остальными компонентами, на пользователя (действует во всех его проектах).
+- **Правило** в `core/AGENTS.md` (блок `check-existing-first`): та же лестница под Битрикс: ядро и D7 API → модули проекта и `/local` → компоненты, события, агенты → одна строка → минимум. Для аналитика:
+  есть ли уже типовое решение или существующий отчёт, прежде чем ставить задачу на новое.
+- **Ponytail касается только кода, при любой роли.** Постановки, требования, паспорта задач, ТЗ, схемы, протоколы,
+  тест-кейсы и обязательные комментарии не сокращаются: их полноту задаёт стандарт команды. Это сказано в правиле
+  и в скиллах аналитика и тестировщика. Валидацию, права и защиту данных правило не упрощает.
 
-Включить:
+Режим по роли `--role developer|analyst` (или `BITRIX_ROLE`): `developer` (по умолчанию) → `lite`, `analyst` → `off`.
 ```bash
-sh onboard/install.sh --with-ponytail --project /путь/к/проекту                      # lite
-sh onboard/install.sh --with-ponytail --ponytail-mode full --project /путь/к/проекту
+sh onboard/install.sh                         # Ponytail ставится вместе с остальным (роль developer)
+sh onboard/install.sh --role analyst          # аналитик: Ponytail выключен по умолчанию
+sh onboard/install.sh --ponytail-mode full    # режим явно (одиночная работа)
+sh onboard/install.sh --no-ponytail           # без плагина
+sh onboard/install.sh --project /путь         # куда дописать правило (иначе каталог запуска с composer.json)
 ```
-Режим: `lite` по умолчанию (для команд: агент делает, что просили, и одной строкой называет более простой путь),
-`full` — для одиночной работы (лестница обязательна). Режим пишется в `~/.config/ponytail/config.json`, только если
-его там ещё нет; сменить потом — `/ponytail default full` в агенте или переменная `PONYTAIL_DEFAULT_MODE`.
-Отдельно, без установщика: `python3 scripts/ponytail_setup.py --help` (`--no-plugin` — только правило).
+Обновление — тот же `install.sh --no-tools`, Ponytail ставится и там (кроме тех, кто выключил его руками).
 
 Повторный запуск безопасен: плагин ставится штатными `claude plugin` / `codex plugin`, чужие настройки не
-трогаются, выключенный руками Ponytail обратно не включается, блок правила заменяется, а не дублируется. После
-установки в Codex один раз открой `/hooks` и разреши два хука Ponytail; для хуков нужен `node`.
+трогаются. Режим пишется в `~/.config/ponytail/config.json`, только если его там ещё нет; сменить потом —
+`/ponytail default <режим>` в агенте. После установки в Codex один раз открой `/hooks` и разреши два хука Ponytail;
+для хуков нужен `node`.
 
-Выключить: `claude plugin disable ponytail@ponytail`; в Codex — `enabled = false` в `[plugins."ponytail@ponytail"]`
-файла `~/.codex/config.toml` (или `codex plugin remove ponytail@ponytail`); на время сессии — `stop ponytail`.
-Правило — удалить блок между метками `check-existing-first` в `AGENTS.md`.
+Выключить насовсем (установщик и обновление уважают): `claude plugin disable ponytail@ponytail`; в Codex —
+`enabled = false` в `[plugins."ponytail@ponytail"]` файла `~/.codex/config.toml`; или `/ponytail default off`.
+`uninstall`/`remove` не годятся: следующее обновление поставит плагин снова. На время сессии — `stop ponytail`.
 
 ## Идея
 У Битрикс два поколения ядра (процедурное + D7), много legacy, фрагментированная документация и **нет официальных

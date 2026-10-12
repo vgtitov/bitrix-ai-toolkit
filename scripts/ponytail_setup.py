@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""Необязательно: Ponytail (github.com/DietrichGebert/ponytail, MIT) и правило «сначала проверь, что уже есть».
+"""Ponytail (github.com/DietrichGebert/ponytail, MIT) в Claude Code и Codex + правило «сначала проверь, что уже есть».
 
-Установщик набора вызывает этот скрипт ТОЛЬКО по явному флагу --with-ponytail; без флага ничего
-не меняется. Скрипт ставит плагин в Claude Code и Codex и, если передан --project, дописывает
-правило из core/optional/check-existing-first.md в AGENTS.md проекта (блок между метками,
-повторный запуск заменяет блок). Идемпотентно: штатные CLI `claude plugin` и `codex plugin`
-сами дописывают свои настройки и не трогают чужие. Если пользователь выключил Ponytail
-руками (enabled = false), установщик его не включает обратно.
+Установщик и обновление набора вызывают скрипт по умолчанию; отключить: флаг --no-ponytail установщика.
+Идемпотентно: штатные CLI `claude plugin` и `codex plugin` сами дописывают свои настройки и не
+трогают чужие. Не ставит, если пользователь выключил Ponytail: enabled = false у плагина или
+defaultMode "off" в ~/.config/ponytail/config.json (команда `/ponytail default off`).
 
-  python scripts/ponytail_setup.py                 # режим lite (по умолчанию, для команд)
+Правило берётся из core/AGENTS.md (блок между метками check-existing-first). Ponytail касается
+только кода: документы, постановки, ТЗ, тест-кейсы не сокращаются (сказано в самом правиле).
+С --project блок дописывается в AGENTS.md проекта, повторный запуск заменяет блок.
+
+  python scripts/ponytail_setup.py                 # режим по роли: analyst -> off, остальные -> lite
+  python scripts/ponytail_setup.py --role analyst  # роль явно (иначе BITRIX_ROLE / ONEC_ACTIVE_PROFILE)
   python scripts/ponytail_setup.py --mode full     # одиночная работа
   python scripts/ponytail_setup.py --project DIR   # плюс правило в DIR/AGENTS.md
   python scripts/ponytail_setup.py --no-plugin --project DIR   # только правило
@@ -32,7 +35,7 @@ PLUGIN = "ponytail@ponytail"
 REPO = "DietrichGebert/ponytail"
 MODES = ("off", "lite", "full", "ultra")
 ROOT = Path(__file__).resolve().parents[1]
-RULE = ROOT / "core" / "optional" / "check-existing-first.md"
+RULE_SRC = ROOT / "core" / "AGENTS.md"
 BEGIN, END = "<!-- check-existing-first:begin -->", "<!-- check-existing-first:end -->"
 
 
@@ -91,6 +94,23 @@ def set_default_mode(mode: str, dry: bool) -> str:
     return f"режим по умолчанию: {mode} ({path})"
 
 
+def mode_for_role(role: str) -> str:
+    # аналитику Ponytail по умолчанию выключен: его результат — текст; правило «только код» действует при любой роли
+    return "off" if role.strip().lower() == "analyst" else "lite"
+
+
+def rule_block() -> str:
+    src = RULE_SRC.read_text(encoding="utf-8")
+    return BEGIN + src.split(BEGIN, 1)[1].split(END, 1)[0] + END + "\n"
+
+
+def user_turned_off() -> bool:
+    try:
+        return json.loads(ponytail_config_path().read_text(encoding="utf-8-sig")).get("defaultMode") == "off"
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
 def write_rule(project: Path, dry: bool) -> str:
     project = project.resolve()
     if project == ROOT:
@@ -102,7 +122,7 @@ def write_rule(project: Path, dry: bool) -> str:
         old = target.read_text(encoding="utf-8") if target.exists() else ""
     except (OSError, UnicodeError) as e:
         return f"правило: {target} не читается ({e}), не трогаю"
-    block = f"{BEGIN}\n{RULE.read_text(encoding='utf-8').strip()}\n{END}\n"
+    block = rule_block()
     if old.count(BEGIN) != old.count(END) or old.count(BEGIN) > 1 or old.find(END) < old.find(BEGIN):
         return f"правило: метки check-existing-first в {target} повреждены, не трогаю; поправь руками"
     if BEGIN in old:
@@ -141,17 +161,23 @@ AGENTS = {
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--mode", choices=MODES, default="lite", help="режим по умолчанию (lite — команда, full — одиночка)")
+    ap.add_argument("--mode", choices=MODES, help="режим по умолчанию; без флага — по роли: analyst → off, иначе lite")
+    ap.add_argument("--role", default=os.environ.get("BITRIX_ROLE") or os.environ.get("ONEC_ACTIVE_PROFILE") or "",
+                    help="роль/профиль (по умолчанию из BITRIX_ROLE или ONEC_ACTIVE_PROFILE)")
     ap.add_argument("--project", type=Path, help="каталог проекта: дописать правило в его AGENTS.md")
     ap.add_argument("--no-plugin", action="store_true", help="плагин не ставить, только правило")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args(argv)
+    a.mode = a.mode or mode_for_role(a.role)
 
     if a.project:
         print("  [ok] " + write_rule(a.project, a.dry_run))
     if a.no_plugin:
         return 0
     installed = False
+    if user_turned_off():
+        print("  [=] Ponytail выключен пользователем (defaultMode off), плагин не трогаю")
+        return 0
     for name, (disabled, steps) in AGENTS.items():
         exe = shutil.which(name)
         if not exe:

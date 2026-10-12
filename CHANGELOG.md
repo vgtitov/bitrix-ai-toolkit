@@ -5,10 +5,11 @@
 ## [Unreleased]
 
 ### Added
-- Необязательно, по флагу установщика: плагин [Ponytail](https://github.com/DietrichGebert/ponytail) (MIT) для
-  Claude Code и Codex и правило «сначала проверь, что уже есть» под Битрикс
-  (`core/optional/check-existing-first.md`), `scripts/ponytail_setup.py`. Без флага установка и поведение агентов
-  не меняются; `core/AGENTS.md` и скиллы не тронуты.
+- Плагин [Ponytail](https://github.com/DietrichGebert/ponytail) (MIT) для Claude Code и Codex ставится установщиком
+  и обновлением по умолчанию (`scripts/ponytail_setup.py`; отключить — `--no-ponytail`). Режим по роли, аналитику
+  `off`. Выключенный руками не включается обратно.
+- Правило «сначала проверь, что уже есть» под Битрикс в `core/AGENTS.md`. Ponytail касается только кода:
+  документы аналитика и тестировщика не сокращаются (правило, скиллы `*-analyst`, `*-tester`).
 
 ### Changed
 - `LICENSE` содержит только текст MIT; оговорка о товарных знаках перенесена в `NOTICE.md`, чтобы GitHub и каталоги
