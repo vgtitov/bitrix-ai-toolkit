@@ -122,7 +122,10 @@ def write_rule(project: Path, dry: bool) -> str:
         old = target.read_text(encoding="utf-8") if target.exists() else ""
     except (OSError, UnicodeError) as e:
         return f"правило: {target} не читается ({e}), не трогаю"
-    block = rule_block()
+    try:
+        block = rule_block()
+    except (OSError, IndexError) as e:
+        return f"правило: в {RULE_SRC} нет блока check-existing-first ({e}), пропуск"
     if old.count(BEGIN) != old.count(END) or old.count(BEGIN) > 1 or old.find(END) < old.find(BEGIN):
         return f"правило: метки check-existing-first в {target} повреждены, не трогаю; поправь руками"
     if BEGIN in old:

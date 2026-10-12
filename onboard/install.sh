@@ -23,6 +23,7 @@ for a in "$@"; do
   [ "$a" = "--no-ponytail" ] && WITH_PONYTAIL=0
   prev="$a"
 done
+[ "$WITH_PONYTAIL" = 0 ] && [ -n "$PONYTAIL_MODE" ] && { echo "  ! --no-ponytail и --ponytail-mode вместе не имеют смысла"; exit 1; }
 case "$PONYTAIL_MODE" in ""|off|lite|full|ultra) ;; *) echo "  ! --ponytail-mode: нужен off|lite|full|ultra"; exit 1;; esac
 case "$BITRIX_ROLE" in developer|analyst) ;; *) echo "  ! --role: нужен developer|analyst"; exit 1;; esac
 export BITRIX_ROLE
