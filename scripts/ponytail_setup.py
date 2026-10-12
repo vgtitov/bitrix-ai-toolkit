@@ -37,6 +37,8 @@ MODES = ("off", "lite", "full", "ultra")
 ROOT = Path(__file__).resolve().parents[1]
 RULE_SRC = ROOT / "core" / "AGENTS.md"
 BEGIN, END = "<!-- check-existing-first:begin -->", "<!-- check-existing-first:end -->"
+# какой режим записал сам установщик: так off аналитика по роли не путается с отказом человека
+SET_BY_KEY = "aiToolkitDefault"
 
 
 def claude_disabled() -> bool:
@@ -88,6 +90,7 @@ def set_default_mode(mode: str, dry: bool) -> str:
     if "defaultMode" in data:
         return f"режим уже задан: {data['defaultMode']} ({path}), не трогаю"
     data["defaultMode"] = mode
+    data[SET_BY_KEY] = mode
     if not dry:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -101,12 +104,17 @@ def mode_for_role(role: str) -> str:
 
 def rule_block() -> str:
     src = RULE_SRC.read_text(encoding="utf-8")
+    if src.count(BEGIN) != 1 or src.count(END) != 1 or src.find(END) < src.find(BEGIN):
+        raise ValueError("метки повреждены или отсутствуют")
     return BEGIN + src.split(BEGIN, 1)[1].split(END, 1)[0] + END + "\n"
 
 
 def user_turned_off() -> bool:
+    # off, который записал сам установщик по роли (аналитик), — не отказ: плагин можно доставить
+    # в агент, появившийся позже; режим при этом остаётся off. Отказ — off, выбранный человеком.
     try:
-        return json.loads(ponytail_config_path().read_text(encoding="utf-8-sig")).get("defaultMode") == "off"
+        data = json.loads(ponytail_config_path().read_text(encoding="utf-8-sig"))
+        return data.get("defaultMode") == "off" and data.get(SET_BY_KEY) != "off"
     except (OSError, ValueError, AttributeError):
         return False
 
@@ -124,8 +132,8 @@ def write_rule(project: Path, dry: bool) -> str:
         return f"правило: {target} не читается ({e}), не трогаю"
     try:
         block = rule_block()
-    except (OSError, IndexError) as e:
-        return f"правило: в {RULE_SRC} нет блока check-existing-first ({e}), пропуск"
+    except (OSError, IndexError, ValueError) as e:
+        return f"правило: в {RULE_SRC} нет целого блока check-existing-first ({e}), пропуск"
     if old.count(BEGIN) != old.count(END) or old.count(BEGIN) > 1 or old.find(END) < old.find(BEGIN):
         return f"правило: метки check-existing-first в {target} повреждены, не трогаю; поправь руками"
     if BEGIN in old:

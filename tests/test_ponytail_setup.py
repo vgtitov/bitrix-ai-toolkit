@@ -13,6 +13,44 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import ponytail_setup as ps  # noqa: E402
 
 
+def test_generated_off_is_not_opt_out():
+    saved = dict(os.environ)
+    try:
+        with tempfile.TemporaryDirectory() as t:
+            os.environ["XDG_CONFIG_HOME"] = t
+            cfg = Path(t) / "ponytail" / "config.json"
+            cfg.parent.mkdir(parents=True)
+            cfg.write_text(json.dumps({"defaultMode": "off", ps.SET_BY_KEY: "off"}))
+            assert not ps.user_turned_off()          # off аналитика от установщика
+            cfg.write_text(json.dumps({"defaultMode": "off", ps.SET_BY_KEY: "lite"}))
+            assert ps.user_turned_off()              # человек сам сменил lite на off
+            cfg.write_text(json.dumps({"defaultMode": "off"}))
+            assert ps.user_turned_off()              # off без метки — выбор человека
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+
+
+def test_rule_block_rejects_broken_markers():
+    saved_src = ps.RULE_SRC
+    try:
+        with tempfile.TemporaryDirectory() as t:
+            src = Path(t) / "AGENTS.md"
+            src.write_text("x\n" + ps.BEGIN + "\nправило\nхвост без конца\n")
+            ps.RULE_SRC = src
+            try:
+                ps.rule_block()
+                assert False, "блок без END не должен приниматься"
+            except ValueError:
+                pass
+            proj = Path(t) / "proj"
+            proj.mkdir()
+            assert "пропуск" in ps.write_rule(proj, dry=True)
+            assert not (proj / "AGENTS.md").exists()
+    finally:
+        ps.RULE_SRC = saved_src
+
+
 def test_all():
     saved = dict(os.environ)
     try:
@@ -56,7 +94,7 @@ def _run():
         cfg.parent.mkdir(parents=True)
         cfg.write_text('{"hideStatus": true}')
         ps.main(["--mode", "lite"])
-        assert json.loads(cfg.read_text()) == {"hideStatus": True, "defaultMode": "lite"}
+        assert json.loads(cfg.read_text()) == {"hideStatus": True, "defaultMode": "lite", ps.SET_BY_KEY: "lite"}
         ps.main(["--mode", "full"])
         assert json.loads(cfg.read_text())["defaultMode"] == "lite"
 
