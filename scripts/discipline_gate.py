@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -238,6 +239,9 @@ def _strip(data: dict) -> None:
 
 def _save(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    backup = path.with_name(path.name + ".bak-ai-toolkit")          # одна копия исходного файла, до первой правки
+    if path.exists() and not backup.exists():
+        shutil.copy2(path, backup)
     tmp = path.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     os.replace(tmp, path)

@@ -39,7 +39,7 @@ def plugin_disabled() -> bool:
     return isinstance(data, dict) and (data.get("enabledPlugins") or {}).get(PLUGIN) is False
 
 
-def run(cmd: list, dry: bool, timeout: int = 600) -> bool:
+def run(cmd: list, dry: bool, timeout: int = 180) -> bool:    # за корпоративным прокси npm может висеть: не ждём вечно
     if dry:
         print("    $ " + " ".join(cmd))
         return True
