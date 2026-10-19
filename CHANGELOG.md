@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-20
+
 ### Added
 - Второе мнение другой моделью: `scripts/second_opinion.py` (Codex → Copilot или иной ассистент → модель без
   обучения, только настроенное) и `scripts/codex_setup.py` (плагин Codex и CLI, проверка геоблока OpenAI);
