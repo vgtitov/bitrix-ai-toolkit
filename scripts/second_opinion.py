@@ -279,8 +279,10 @@ def ask(prompt: str, chain=TEXT_CHAIN, codex=codex_exec, files=(), risk: str = "
 
 def status() -> int:
     print("Codex CLI:", "есть" if shutil.which("codex") else "нет (scripts/codex_setup.py)")
-    print("Copilot/иной ассистент:", "AI_TOOLKIT_COPILOT_CMD задана" if os.environ.get("AI_TOOLKIT_COPILOT_CMD")
-          else "не настроен")
+    cmd = copilot_cmd()
+    print("M365 Copilot (по умолчанию) или иной ассистент:",
+          ("настроен" + (" (своя команда)" if os.environ.get("AI_TOOLKIT_COPILOT_CMD") else " (встроенный адаптер)")) if cmd
+          else "не настроен (вход: python scripts/copilot_setup.py --login)")
     print("Модель без обучения:", "включена" if os.environ.get("OPENROUTER_API_KEY")
           and os.environ.get("AI_TOOLKIT_NOTRAIN") == "1" else "выключена (OPENROUTER_API_KEY + AI_TOOLKIT_NOTRAIN=1)")
     return 0
