@@ -97,7 +97,7 @@ e-mail и телефонов); большой дифф `review` уходит а�
 `status` показывает, что настроено.
 
 **По умолчанию второе мнение даёт M365 Copilot** (лимитов у всех много, данные уже в корпоративном контуре):
-`install.sh` ставит браузер для адаптера (`scripts/copilot_setup.py`), вход в M365 один раз
+`install.sh` проверяет Microsoft Edge, через который работает адаптер (`scripts/copilot_setup.py`), вход в M365 один раз
 (`python3 scripts/copilot_setup.py --login`). Codex — для продвинутого (`--risk critical`) и резервом.
 Не ставить: `--no-copilot`.
 

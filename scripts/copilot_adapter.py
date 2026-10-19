@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Адаптер к M365 Copilot (веб) через Playwright под залогиненной сессией: для second_opinion.py.
 С ЯВНЫМ выбором сильной модели (никогда не оставляет "Auto"). Сохранённая сессия, окно для входа один раз,
-дальше сам. Нужен Playwright: `uv run --with playwright python scripts/copilot_adapter.py --login`, браузер
-`playwright install chromium` (около 300 МБ). Необязательный: без него цепочка второго мнения идёт дальше.
+дальше сам. Нужны Playwright (подтягивает `uv run --with playwright`) и установленный Microsoft Edge: адаптер
+работает через него, браузер скачивать не нужно. Необязательный: без него цепочка второго мнения идёт дальше.
 
 Подключение к цепочке: AI_TOOLKIT_COPILOT_CMD="uv run --with playwright python <путь>/scripts/copilot_adapter.py -"
 (запрос читается со STDIN, ответ в STDOUT, вложения как --file).
