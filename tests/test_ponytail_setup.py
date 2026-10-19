@@ -100,9 +100,13 @@ def _run():
 
         # фальшивый claude: «установка» успешна; codex по-прежнему выключен руками
         (t / "empty").mkdir()
-        fake = t / "empty" / "claude"
-        fake.write_text(f"#!/bin/sh\necho \"$@\" >> {t}/calls\nexit 0\n")
-        fake.chmod(0o755)
+        if os.name == "nt":                                  # на Windows запускаемый файл — .cmd
+            fake = t / "empty" / "claude.cmd"
+            fake.write_text(f"@echo off\r\necho %* >> {t}\\calls\r\nexit /b 0\r\n")
+        else:
+            fake = t / "empty" / "claude"
+            fake.write_text(f"#!/bin/sh\necho \"$@\" >> {t}/calls\nexit 0\n")
+            fake.chmod(0o755)
         (t / "claude" / "settings.json").write_text("{}")
 
         # режим пишется один раз, чужие ключи и выбор пользователя сохраняются
