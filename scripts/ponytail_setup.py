@@ -156,8 +156,11 @@ def write_rule(project: Path, dry: bool) -> str:
         target.write_text(new, encoding="utf-8")
     hint = ""
     claude_md = project / "CLAUDE.md"
-    if claude_md.exists() and "@AGENTS.md" not in claude_md.read_text(encoding="utf-8", errors="ignore"):
-        hint = "; Claude Code читает его, только если в CLAUDE.md есть строка @AGENTS.md"
+    try:
+        if claude_md.is_file() and "@AGENTS.md" not in claude_md.read_text(encoding="utf-8", errors="ignore"):
+            hint = "; Claude Code читает его, только если в CLAUDE.md есть строка @AGENTS.md"
+    except OSError:
+        pass                                              # подсказка необязательна
     return f"правило «сначала проверь, что уже есть» -> {target}{hint}"
 
 

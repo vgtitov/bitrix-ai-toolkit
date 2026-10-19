@@ -178,7 +178,15 @@ def collect_diff(repo: Path, base: str | None, commit: str | None) -> str:
         return _git(repo, "diff", "--no-color", "-U5", f"{commit}^1", commit) if parents else \
             _git(repo, "show", "--format=", "--no-color", "-U5", commit)   # merge — к первому родителю, корень целиком
     mb = _git(repo, "merge-base", base, "HEAD").strip()
-    return _git(repo, "diff", "--no-color", "-U5", mb)        # с рабочим деревом: и незакоммиченные правки
+    diff = _git(repo, "diff", "--no-color", "-U5", mb)        # с рабочим деревом: и незакоммиченные правки
+    for rel in _git(repo, "ls-files", "--others", "--exclude-standard").splitlines():     # новые, ещё не добавленные файлы
+        f = repo / rel
+        try:
+            body = f.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            continue                                         # двоичный или нечитаемый — пропуск
+        diff += f"diff --git a/{rel} b/{rel}\nnew file\n--- /dev/null\n+++ b/{rel}\n" + "".join(f"+{l}\n" for l in body.splitlines())
+    return diff
 
 
 def has_pii(*texts: str) -> bool:
@@ -280,7 +288,7 @@ def status() -> int:
 
 def _report(kind: str, who: str, body: str) -> Path:
     REPORTS.mkdir(parents=True, exist_ok=True)
-    p = REPORTS / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{who}.md"
+    p = REPORTS / f"{datetime.now():%Y%m%d-%H%M%S-%f}-{os.getpid()}-{kind}-{who}.md"
     p.write_text(body, encoding="utf-8")
     return p
 

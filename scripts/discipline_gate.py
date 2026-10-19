@@ -242,7 +242,7 @@ def _save(path: Path, data: dict) -> None:
     backup = path.with_name(path.name + ".bak-ai-toolkit")          # одна копия исходного файла, до первой правки
     if path.exists() and not backup.exists():
         shutil.copy2(path, backup)
-    tmp = path.with_suffix(".json.tmp")
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")           # свой временный файл у каждого процесса
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     os.replace(tmp, path)
 

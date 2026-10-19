@@ -52,6 +52,11 @@ def test_pii_goes_only_to_trusted_assistant():
             assert so.ask(text, chain=chain, codex=codex)[0] == "copilot", text
             assert seen == [text]
         assert not codex_called
+        silent = (("copilot", lambda p, files=(): None), ("notrain", outside))   # доверенный молчит — Codex всё равно нельзя
+        for text in pii_texts:
+            seen.clear()
+            assert so.ask(text, chain=silent, codex=codex) == ("", ""), text
+        assert not codex_called and not seen
         for text in ("версия 8.3.27.1606, задача DEV1C-2476", "дата 2026-10-12", "строки 120-135"):
             assert not so.has_pii(text), text
         assert so.ask("без данных", chain=(), codex=codex)[0] == "codex"
@@ -154,6 +159,8 @@ def test_collect_diff_sees_worktree_and_merge():
         g("add", "-A"); g("commit", "-qm", "base")
         g("checkout", "-qb", "f"); Path(t, "b.txt").write_text("2\n"); g("add", "-A"); g("commit", "-qm", "f")
         g("checkout", "-q", "main"); g("merge", "-q", "--no-ff", "f", "-m", "merge")
+        Path(t, "new.txt").write_text("не добавлен\n")
+        assert "new.txt" in so.collect_diff(Path(t), "HEAD", None)          # новый файл виден
         assert "b.txt" in so.collect_diff(Path(t), None, "HEAD")       # merge — к первому родителю
         Path(t, "a.txt").write_text("changed\n")                       # незакоммиченная правка
         assert "changed" in so.collect_diff(Path(t), "HEAD", None)
