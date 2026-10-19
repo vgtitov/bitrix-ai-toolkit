@@ -4,9 +4,11 @@
 Claude не проверяет сам себя: ревью и проверку выносит модель другого семейства. Цепочка идёт по
 порядку и вызывает только то, что у человека настроено:
 
-  1. Codex (OpenAI)          — если установлен CLI `codex` и выполнен вход (`codex login`).
-  2. Copilot или иной        — если задана AI_TOOLKIT_COPILOT_CMD: команда, которая читает вопрос
-     корпоративный ассистент   со STDIN и печатает ответ (адаптер к M365 Copilot или другому сервису).
+  1. M365 Copilot — ПО УМОЛЧАНИЮ для команды (лимитов у всех много, данные уже в корпоративном контуре):
+     встроенный адаптер scripts/copilot_adapter.py после разового входа (scripts/copilot_setup.py), либо
+     своя команда в AI_TOOLKIT_COPILOT_CMD (читает вопрос со STDIN, печатает ответ).
+  2. Codex (OpenAI)          — для продвинутого: --risk critical, либо резервом, если Copilot не ответил;
+                               нужен CLI `codex` и вход (`codex login`).
   3. Модель без обучения     — только если есть OPENROUTER_API_KEY И явно разрешено AI_TOOLKIT_NOTRAIN=1;
                                запрос уходит лишь провайдерам, которые не хранят и не обучаются
                                (provider.data_collection = deny, zdr = true).
@@ -14,8 +16,8 @@ Claude не проверяет сам себя: ревью и проверку �
 
 Звено пропускается, если его нет, оно в лимите, недоступно из страны (геоблок OpenAI в РФ, РБ и
 других регионах — нужен VPN) или вернуло пустой ответ. Не ответил никто — код 2, и «готово» нельзя.
-E-mail и телефоны в тексте заменяются на <скрыто> до отправки любому звену. Если они нашлись, Codex
-(у него есть доступ к файлам) пропускается: проверяют только текстовые звенья по очищенному тексту.
+E-mail и телефоны в запросе, диффе или вложении: уходит только доверенному корпоративному ассистенту
+(AI_TOOLKIT_COPILOT_CMD, например M365 Copilot); Codex и внешние модели пропускаются. Нет ассистента — отказ.
 
   python scripts/second_opinion.py review --base origin/main [--repo .]
   python scripts/second_opinion.py review --commit HEAD
@@ -30,6 +32,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -73,10 +76,26 @@ def codex_exec(args: list, cwd: Path, stdin: str | None = None) -> str | None:
     return r.stdout                      # только ответ: в stderr ход работы и исходный запрос
 
 
-def copilot(prompt: str) -> str | None:
-    cmd = os.environ.get("AI_TOOLKIT_COPILOT_CMD", "").strip()
+ADAPTER = Path(__file__).resolve().parent / "copilot_adapter.py"
+COPILOT_PROFILE = Path.home() / ".cache" / "ai_toolkit_copilot_profile"
+
+
+def copilot_cmd() -> str:
+    """Команда доверенного корпоративного ассистента. AI_TOOLKIT_COPILOT_CMD задаёт её явно; иначе по
+    умолчанию встроенный адаптер к M365 Copilot, если вход в него уже выполнен (scripts/copilot_setup.py)."""
+    explicit = os.environ.get("AI_TOOLKIT_COPILOT_CMD", "").strip()
+    if explicit:
+        return explicit
+    if ADAPTER.is_file() and COPILOT_PROFILE.is_dir() and any(COPILOT_PROFILE.iterdir()) and shutil.which("uv"):
+        return f'uv run --quiet --with playwright python "{ADAPTER}" -'
+    return ""
+
+
+def copilot(prompt: str, files=()) -> str | None:
+    cmd = copilot_cmd()
     if not cmd:
         return None
+    cmd += "".join(" --file " + shlex.quote(str(f)) for f in files)     # вложения читаются целиком, лимит запроса не мешает
     try:
         # команду задаёт сам человек; оболочка разбирает кавычки и на Windows. По таймауту гасим всю группу
         grp = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
@@ -107,7 +126,9 @@ def copilot(prompt: str) -> str | None:
     return out if proc.returncode == 0 and out.strip() else None
 
 
-def notrain(prompt: str) -> str | None:
+def notrain(prompt: str, files=()) -> str | None:
+    if files:
+        return None                                    # вложить файл в запрос к этому звену нельзя
     key = os.environ.get("OPENROUTER_API_KEY", "")
     if not key or os.environ.get("AI_TOOLKIT_NOTRAIN") != "1":
         return None
@@ -160,50 +181,91 @@ def collect_diff(repo: Path, base: str | None, commit: str | None) -> str:
     return _git(repo, "diff", "--no-color", "-U5", mb)        # с рабочим деревом: и незакоммиченные правки
 
 
-def redact(text: str) -> tuple:
-    """Заменить e-mail и телефоны на <скрыто> до отправки любому звену → (текст, сколько скрыто)."""
-    return PII_RX.subn("<скрыто>", text)
+def has_pii(*texts: str) -> bool:
+    return any(PII_RX.search(t) for t in texts)
 
 
-def review(repo: Path, base: str | None, commit: str | None, chain=TEXT_CHAIN, codex=codex_exec) -> tuple:
+NO_TRUSTED = "в тексте есть e-mail или телефон, а доверенный корпоративный ассистент (AI_TOOLKIT_COPILOT_CMD) не настроен: Codex и внешним моделям такое не отправляю"
+
+
+def review(repo: Path, base: str | None, commit: str | None, chain=TEXT_CHAIN, codex=codex_exec,
+           risk: str = "normal") -> tuple:
     diff = collect_diff(repo, base, commit)
     if not diff.strip():
         return "none", "Дифф пуст — проверять нечего."
-    diff, hidden = redact(diff)
+    hidden = has_pii(diff)
+    if hidden and not copilot_cmd():
+        return "", NO_TRUSTED
     if hidden:
-        # в диффе ПД: Codex с инструментами может прочитать исходные файлы, поэтому его не зовём;
-        # проверяют только текстовые звенья по очищенному диффу
-        print(f"⚠ в диффе скрыто {hidden} e-mail/телефонов; Codex пропущен, проверка по очищенному тексту", flush=True)
-    else:
-        out = codex(["exec", "review"] + (["--commit", commit] if commit else ["--base", base]), repo)
-        if out:
-            return "codex", out
-    chunks = split_diff(diff)
-    for who, fn in chain:
-        parts = []
+        # в диффе ПД: уходит только доверенному корпоративному ассистенту, без редактирования
+        print("⚠ в диффе e-mail или телефон: Codex и внешние модели пропущены, только доверенный ассистент", flush=True)
+    fns = dict(chain)
+    for name in order(risk, chain):
+        if hidden and not trusted_only(name):
+            continue
+        if name == "codex":
+            out = codex(["exec", "review"] + (["--commit", commit] if commit else ["--base", base]), repo)
+            if out:
+                return "codex", out
+            continue
+        if len(diff) > CHUNK and name == "copilot":          # большой дифф — вложением целиком, без нарезки
+            with tempfile.TemporaryDirectory() as tmp:
+                f = Path(tmp) / "diff.patch"
+                f.write_text(diff, encoding="utf-8")
+                ans = fns[name](REVIEW_PROMPT.format(part="1 из 1 (дифф во вложении)", repo=repo.name, chunk=""), [str(f)])
+            if ans:
+                return name, ans
+            continue
+        chunks, parts = split_diff(diff), []
         for i, ch in enumerate(chunks, 1):
-            ans = fn(REVIEW_PROMPT.format(part=f"{i} из {len(chunks)}", repo=repo.name, chunk=ch))
+            ans = fns[name](REVIEW_PROMPT.format(part=f"{i} из {len(chunks)}", repo=repo.name, chunk=ch), ())
             if not ans:
                 break
             parts.append(f"## Часть {i}\n\n{ans.strip()}\n")
         if len(parts) == len(chunks):
-            return who, "\n".join(parts)
+            return name, "\n".join(parts)
     return "", ""
 
 
-def ask(prompt: str, chain=TEXT_CHAIN, codex=codex_exec) -> tuple:
-    prompt, hidden = redact(prompt)
-    if hidden:
-        print(f"⚠ скрыто {hidden} e-mail/телефонов; Codex пропущен, проверка по очищенному тексту", flush=True)
-    else:
-        with tempfile.TemporaryDirectory() as tmp:
-            out = codex(["exec", "--skip-git-repo-check", "-s", "read-only", "-"], Path(tmp), stdin=prompt)
-        if out:
-            return "codex", out
-    for who, fn in chain:
-        ans = fn(prompt)
-        if ans:
-            return who, ans
+def order(risk: str, chain) -> list:
+    """Порядок звеньев по риску: critical — Codex первым (его лимит маленький, берём на важное);
+    normal — корпоративный ассистент первым, Codex резервом; low — без Codex."""
+    names = [n for n, _ in chain]
+    return {"critical": ["codex"] + names, "normal": names[:1] + ["codex"] + names[1:], "low": names}[risk]
+
+
+def _check_files(files) -> str:
+    return next((f"вложения нет: {f}" for f in files if not Path(f).expanduser().is_file()), "")
+
+
+def trusted_only(name: str) -> bool:
+    return name == "copilot"
+
+
+def ask(prompt: str, chain=TEXT_CHAIN, codex=codex_exec, files=(), risk: str = "normal") -> tuple:
+    bad = _check_files(files)
+    if bad:
+        return "", bad
+    files = [str(Path(f).expanduser().resolve()) for f in files]
+    pii = has_pii(prompt, *(Path(f).read_text(encoding="utf-8", errors="replace") for f in files))
+    if pii and not copilot_cmd():
+        return "", NO_TRUSTED
+    if pii:
+        print("⚠ e-mail или телефон в запросе или вложении: только доверенный ассистент, Codex и внешние модели пропущены", flush=True)
+    fns = dict(chain)
+    for name in order(risk, chain):
+        if pii and not trusted_only(name):
+            continue
+        if name == "codex":
+            full = prompt + ("\n\nВложения (прочитай по путям перед ответом):\n" + "\n".join(files) if files else "")
+            with tempfile.TemporaryDirectory() as tmp:
+                out = codex(["exec", "--skip-git-repo-check", "-s", "read-only", "-"], Path(tmp), stdin=full)
+            if out:
+                return "codex", out
+        else:
+            ans = fns[name](prompt, files)
+            if ans:
+                return name, ans
     return "", ""
 
 
@@ -233,18 +295,22 @@ def main(argv=None) -> int:
     g.add_argument("--commit")
     ak = sub.add_parser("ask")
     ak.add_argument("text")
+    ak.add_argument("--file", action="append", default=[], metavar="ПУТЬ", help="приложить файл (повторять)")
+    for sp in (rv, ak):
+        sp.add_argument("--risk", choices=["critical", "normal", "low"], default="normal",
+                        help="critical: Codex первым; normal: ассистент первым, Codex резервом; low: без Codex")
     sub.add_parser("status")
     a = ap.parse_args(argv)
     if a.cmd == "status":
         return status()
     if a.cmd == "review":
         try:
-            who, body = review(a.repo.resolve(), a.base, a.commit)
+            who, body = review(a.repo.resolve(), a.base, a.commit, risk=a.risk)
         except (RuntimeError, OSError) as e:
             print(f"Второе мнение недоступно: {e}")
             return 2
     else:
-        who, body = ask(sys.stdin.read() if a.text == "-" else a.text)
+        who, body = ask(sys.stdin.read() if a.text == "-" else a.text, files=a.file, risk=a.risk)
     if not who:
         print(f"Второе мнение недоступно: {body or 'ни одно звено цепочки не ответило, проверь `status`'}. Готовым не считать.")
         return 2

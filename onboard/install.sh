@@ -9,6 +9,7 @@
 #          sh onboard/install.sh --no-ponytail    # без плагина Ponytail
 #          sh onboard/install.sh --no-discipline  # без Stop-хука дисциплины (иначе ставится, режим warn)
 #          sh onboard/install.sh --no-codex       # без Codex (плагин и CLI для второго мнения)
+#          sh onboard/install.sh --no-copilot     # без M365 Copilot (второе мнение по умолчанию)
 #          --project DIR                          # куда дописать правило в AGENTS.md (иначе каталог запуска,
 #                                                 # если в нём composer.json)
 set -eu
@@ -19,12 +20,13 @@ cd "$ROOT"
 WITH_TOOLS=1
 for a in "$@"; do [ "$a" = "--no-tools" ] && WITH_TOOLS=0; done
 # Ponytail (шаг 5б): по умолчанию ставится; режим по роли; --no-ponytail — без него
-WITH_PONYTAIL=1; WITH_DISCIPLINE=1; WITH_CODEX=1; PONYTAIL_MODE=""; BITRIX_ROLE="${BITRIX_ROLE:-developer}"; PT_PROJECT=""; prev=""
+WITH_PONYTAIL=1; WITH_DISCIPLINE=1; WITH_CODEX=1; WITH_COPILOT=1; PONYTAIL_MODE=""; BITRIX_ROLE="${BITRIX_ROLE:-developer}"; PT_PROJECT=""; prev=""
 for a in "$@"; do
   case "$prev" in --ponytail-mode) PONYTAIL_MODE="$a" ;; --project) PT_PROJECT="$a" ;; --role) BITRIX_ROLE="$a" ;; esac
   [ "$a" = "--no-ponytail" ] && WITH_PONYTAIL=0
   [ "$a" = "--no-discipline" ] && WITH_DISCIPLINE=0
   [ "$a" = "--no-codex" ] && WITH_CODEX=0
+  [ "$a" = "--no-copilot" ] && WITH_COPILOT=0
   prev="$a"
 done
 [ "$prev" = "--ponytail-mode" ] || [ "$prev" = "--role" ] || [ "$prev" = "--project" ] && { echo "  ! $prev: нужно значение"; exit 1; }
@@ -122,6 +124,10 @@ fi
 if [ "$WITH_CODEX" = 1 ]; then
   say "Codex для второго мнения (не ставить: --no-codex)"
   python3 scripts/codex_setup.py || echo "  ! codex_setup с ошибкой (не критично)"
+fi
+if [ "$WITH_COPILOT" = 1 ]; then
+  say "M365 Copilot: второе мнение по умолчанию (вход один раз; не ставить: --no-copilot)"
+  python3 scripts/copilot_setup.py || echo "  ! copilot_setup с ошибкой (не критично)"
 fi
 
 # 6. Самотест

@@ -8,6 +8,8 @@
 - Второе мнение другой моделью: `scripts/second_opinion.py` (Codex → Copilot или иной ассистент → модель без
   обучения, только настроенное) и `scripts/codex_setup.py` (плагин Codex и CLI, проверка геоблока OpenAI);
   ставится `install.sh`, отказ — `--no-codex`.
+- M365 Copilot — второе мнение по умолчанию (`scripts/copilot_adapter.py`, `scripts/copilot_setup.py`), `--risk`,
+  `--file`; e-mail и телефоны уходят только доверенному ассистенту. Отказ — `--no-copilot`.
 - Лестница «минимально достаточного решения» для аналитика и архитектора (`bitrix-analyst/references/solution-ladder.md`):
   аналог Ponytail для анализа и проектирования. Сокращает решение, а не документ.
 - Дисциплина выполнения: Stop-хук `scripts/discipline_gate.py` (код без проверки, обещание без действия, «готово»
