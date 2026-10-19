@@ -45,7 +45,8 @@ def claude_disabled() -> bool:
         data = json.loads((base / "settings.json").read_text(encoding="utf-8-sig"))
     except (OSError, ValueError):
         return False
-    return (data.get("enabledPlugins") or {}).get(PLUGIN) is False
+    plugins = data.get("enabledPlugins") if isinstance(data, dict) else None
+    return isinstance(plugins, dict) and plugins.get(PLUGIN) is False
 
 
 def codex_disabled() -> bool:
@@ -205,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  [-] {name}: CLI не найден, пропуск")
         elif disabled():
             print(f"  [=] {name}: {PLUGIN} выключен пользователем, не включаю")
-        elif all(run([exe, *s], a.dry_run) for s in steps):
+        elif (run([exe, *steps[0]], a.dry_run) or True) and run([exe, *steps[1]], a.dry_run):   # marketplace add на повторе может вернуть ошибку
             print(f"  [ok] {name}: {PLUGIN}")
             installed = True
         else:

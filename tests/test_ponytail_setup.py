@@ -53,6 +53,19 @@ def test_rule_block_rejects_broken_markers():
         ps.RULE_SRC = saved_src
 
 
+def test_claude_disabled_odd_settings():
+    saved = dict(os.environ)
+    try:
+        with tempfile.TemporaryDirectory() as t:
+            os.environ["CLAUDE_CONFIG_DIR"] = t
+            for body in ("[]", '"str"', '{"enabledPlugins": ["a"]}', "null"):
+                (Path(t) / "settings.json").write_text(body)
+                assert not ps.claude_disabled(), body
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+
+
 def test_all():
     saved = dict(os.environ)
     try:
@@ -145,6 +158,7 @@ def _run():
 
 
 if __name__ == "__main__":
+    test_claude_disabled_odd_settings()
     test_generated_off_is_not_opt_out()
     test_rule_block_rejects_broken_markers()
     test_all()

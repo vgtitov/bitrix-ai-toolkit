@@ -136,7 +136,35 @@ def test_install():
         os.environ.update(saved)
 
 
+def test_install_edge_cases():
+    saved = dict(os.environ)
+    try:
+        with tempfile.TemporaryDirectory() as t:
+            os.environ["CLAUDE_CONFIG_DIR"] = t
+            cfg = Path(t) / "settings.json"
+            other = Path(t) / "other" / "discipline_gate.py"
+            other.parent.mkdir()
+            other.write_text("x")
+            hook = lambda p: {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": f'x "{p}" y'}]}]}}  # noqa: E731
+            cfg.write_text(json.dumps(hook(other.as_posix())))
+            dg.install()                                      # живой хук другого набора остаётся один
+            assert len(json.loads(cfg.read_text())["hooks"]["Stop"]) == 1
+            cfg.write_text(json.dumps(hook((Path(t) / "gone" / "discipline_gate.py").as_posix())))
+            dg.install()                                      # хук на удалённый каталог заменяется
+            cmds = [h["command"] for g in json.loads(cfg.read_text())["hooks"]["Stop"] for h in g["hooks"]]
+            assert len(cmds) == 1 and "gone" not in cmds[0]
+            for bad in ({"hooks": {"Stop": "x"}}, []):        # нестандартные формы — не трогаем и не падаем
+                cfg.write_text(json.dumps(bad))
+                before = cfg.read_text()
+                dg.install()
+                assert cfg.read_text() == before
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+
+
 if __name__ == "__main__":
+    test_install_edge_cases()
     test_decide()
     test_modes()
     test_install()

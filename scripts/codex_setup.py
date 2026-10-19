@@ -99,8 +99,8 @@ def main(argv=None) -> int:
     elif not claude:
         print(f"  [-] claude CLI не найден: в приложении поставь плагин командой /plugin marketplace add {MARKET}, "
               f"затем /plugin install {PLUGIN}")
-    elif all(run([claude, *s], a.dry_run) for s in (["plugin", "marketplace", "add", MARKET],
-                                                     ["plugin", "install", PLUGIN])):
+    elif (run([claude, "plugin", "marketplace", "add", MARKET], a.dry_run) or True) and \
+            run([claude, "plugin", "install", PLUGIN], a.dry_run):    # повторный marketplace add — не ошибка
         print(f"  [ok] плагин {PLUGIN}: /codex:review, /codex:adversarial-review, /codex:rescue")
     if not shutil.which("codex"):
         npm = shutil.which("npm")

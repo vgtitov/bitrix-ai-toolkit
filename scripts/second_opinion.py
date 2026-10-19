@@ -145,7 +145,10 @@ def split_diff(diff: str, limit: int = CHUNK) -> list:
 
 
 def _git(repo: Path, *args) -> str:
-    return subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=True).stdout
+    r = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"git {args[0]}: {(r.stderr or r.stdout).strip()[:200]}")
+    return r.stdout
 
 
 def collect_diff(repo: Path, base: str | None, commit: str | None) -> str:
@@ -235,7 +238,11 @@ def main(argv=None) -> int:
     if a.cmd == "status":
         return status()
     if a.cmd == "review":
-        who, body = review(a.repo.resolve(), a.base, a.commit)
+        try:
+            who, body = review(a.repo.resolve(), a.base, a.commit)
+        except (RuntimeError, OSError) as e:
+            print(f"Второе мнение недоступно: {e}")
+            return 2
     else:
         who, body = ask(sys.stdin.read() if a.text == "-" else a.text)
     if not who:

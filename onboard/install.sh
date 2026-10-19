@@ -17,7 +17,7 @@ INVOKED_FROM="$(pwd)"   # откуда запустили — там может 
 prev_arg=""
 cd "$ROOT"
 WITH_TOOLS=1
-[ "${1:-}" = "--no-tools" ] && WITH_TOOLS=0
+for a in "$@"; do [ "$a" = "--no-tools" ] && WITH_TOOLS=0; done
 # Ponytail (шаг 5б): по умолчанию ставится; режим по роли; --no-ponytail — без него
 WITH_PONYTAIL=1; WITH_DISCIPLINE=1; WITH_CODEX=1; PONYTAIL_MODE=""; BITRIX_ROLE="${BITRIX_ROLE:-developer}"; PT_PROJECT=""; prev=""
 for a in "$@"; do
@@ -27,6 +27,7 @@ for a in "$@"; do
   [ "$a" = "--no-codex" ] && WITH_CODEX=0
   prev="$a"
 done
+[ "$prev" = "--ponytail-mode" ] || [ "$prev" = "--role" ] || [ "$prev" = "--project" ] && { echo "  ! $prev: нужно значение"; exit 1; }
 [ "$WITH_PONYTAIL" = 0 ] && [ -n "$PONYTAIL_MODE" ] && { echo "  ! --no-ponytail и --ponytail-mode вместе не имеют смысла"; exit 1; }
 case "$PONYTAIL_MODE" in ""|off|lite|full|ultra) ;; *) echo "  ! --ponytail-mode: нужен off|lite|full|ultra"; exit 1;; esac
 case "$BITRIX_ROLE" in developer|analyst) ;; *) echo "  ! --role: нужен developer|analyst"; exit 1;; esac
@@ -73,7 +74,7 @@ fi
 
 # 2. Git-хуки (commit-msg чистые сообщения + pre-commit bitrix-guard N+1)
 say "Git-хуки"
-python3 scripts/install_git_hooks.py
+python3 scripts/install_git_hooks.py || echo "  ! git-хуки не поставлены (набор не в git-клоне?) — не критично"
 
 # 3. Скиллы → ~/.claude/skills
 say "Скиллы → ~/.claude/skills"

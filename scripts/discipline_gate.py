@@ -243,6 +243,17 @@ def _save(path: Path, data: dict) -> None:
     os.replace(tmp, path)
 
 
+def _marked_scripts(data: dict) -> list:
+    """Пути скриптов уже установленных хуков дисциплины (из любого набора)."""
+    out = []
+    for g in (data.get("hooks") or {}).get("Stop") or []:
+        for h in (g.get("hooks") or []) if isinstance(g, dict) else []:
+            m = re.search(r'"([^"]*discipline_gate\.py)"', str(h.get("command", "")))
+            if m:
+                out.append(m.group(1))
+    return out
+
+
 def install(remove: bool = False) -> int:
     path = settings_path()
     data = _load(path)
@@ -252,8 +263,14 @@ def install(remove: bool = False) -> int:
     if not remove and str((data.get("env") or {}).get("AI_TOOLKIT_DISCIPLINE", "")).lower() == "off":
         print("  [=] дисциплина выключена пользователем (env AI_TOOLKIT_DISCIPLINE=off), не включаю")
         return 0
-    if not isinstance(data.get("hooks", {}), dict):
-        print(f"  [!] {path}: hooks не объект, не трогаю")
+    hooks = data.get("hooks", {})
+    if not isinstance(hooks, dict) or not isinstance(hooks.get("Stop", []), list):
+        print(f"  [!] {path}: hooks или Stop неожиданной формы, не трогаю")
+        return 0
+    mine = Path(__file__).resolve().as_posix()
+    other = [c for c in _marked_scripts(data) if c != mine and Path(c).exists()]
+    if not remove and other:
+        print(f"  [=] хук дисциплины уже стоит от другого набора ({other[0]}), второй не добавляю")
         return 0
     data.setdefault("hooks", {})
     _strip(data)
